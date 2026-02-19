@@ -1,277 +1,123 @@
-# SafeRoute Expo 🛡️
 
-A comprehensive safety-focused mobile application built with React Native and Expo, designed to help users navigate safely and manage emergency contacts with real-time location tracking.
+<div align="center">
 
-## 📱 Project Overview
+# 🛡️ G U A R D I A N &nbsp; A N G E L
+### *The Next Generation of Personal Safety & Rapid Response*
 
-SafeRoute Expo is a cross-platform mobile application that prioritizes user safety by providing:
-- **Smart Route Planning** with safety analysis
-- **Emergency Contact Management** with quick SOS features
-- **Real-time Location Tracking** and sharing
-- **Offline-first Architecture** using SQLite database
-- **Shake-to-SOS** emergency feature
-- **Dark/Light Theme** support
+[![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)](https://supabase.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-B33030?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
 
-## 🏗️ Architecture
+*Integrity • Speed • Empowerment*
 
-The application follows a **modular, context-driven architecture** with:
+🚀 **Built for HACK KRMU 5.0** 🚀
 
-### **Frontend Architecture**
-```
-├── src/
-│   ├── screens/           # Screen components
-│   ├── navigation/        # Navigation configuration
-│   ├── context/          # React Context providers
-│   ├── services/         # Business logic & API layer
-│   ├── features/         # Feature-specific hooks & components
-│   └── utils/           # Utility functions
-```
+[View Demo](https://youtu.be/example) • [Report Bug](https://github.com/Rohanx777/amba/issues) • [Request Feature](https://github.com/Rohanx777/amba/issues)
 
-### **Data Architecture**
-- **Local Database**: SQLite for offline-first data storage
-- **Authentication**: JWT-like session tokens with local validation
-- **State Management**: React Context API
-- **Storage**: AsyncStorage for session persistence
-
-## 🚀 Features
-
-### 🔐 **Authentication System**
-- User registration and login
-- Secure password hashing with salt
-- Session-based authentication
-- Offline-capable user management
-
-### 🗺️ **Navigation & Safety**
-- Interactive map with React Native Maps
-- Real-time location tracking
-- Safety score analysis for routes
-- Saved addresses management
-
-### 🆘 **Emergency Features**
-- Quick SOS button
-- Shake-to-activate emergency
-- Emergency contact management
-- Location sharing with contacts
-
-### 👤 **User Management**
-- User profiles with customization
-- Dark/Light theme preferences
-- Emergency contact setup
-- Address book management
-
-## 🛠️ Technology Stack
-
-### **Frontend**
-- **React Native** (0.81.4) - Cross-platform mobile development
-- **Expo SDK** (~51.0.0) - Development platform
-- **TypeScript** (~5.9.2) - Type safety
-- **React Navigation** (v7) - Navigation library
-
-### **UI/UX**
-- **React Native Maps** - Interactive mapping
-- **Expo Linear Gradient** - Beautiful gradients
-- **React Native Reanimated** - Smooth animations
-- **Expo Status Bar** - Status bar management
-
-### **Data & Storage**
-- **SQLite** (via expo-sqlite) - Local database
-- **AsyncStorage** - Session & preferences storage
-- **Expo Crypto** - Secure hashing & token generation
-
-### **Device Features**
-- **Expo Location** - GPS & location services
-- **Expo Sensors** - Shake detection for SOS
-- **Expo Device** - Device information
-- **React Native Gesture Handler** - Touch gestures
-
-## 📋 Prerequisites
-
-- **Node.js** (v16 or higher)
-- **npm** or **yarn**
-- **Expo CLI** (`npm install -g @expo/cli`)
-- **Expo Go** app (for testing on physical device)
-
-### For Development:
-- **Android Studio** (for Android emulator)
-- **Xcode** (for iOS simulator - macOS only)
-
-## 🔧 Installation & Setup
-
-### 1. **Clone the Repository**
-```bash
-git clone <repository-url>
-cd SafeRouteExpo
-```
-
-### 2. **Install Dependencies**
-```bash
-npm install
-```
-
-### 3. **Start Development Server**
-```bash
-npm start
-# or
-expo start
-```
-
-### 4. **Run on Device/Emulator**
-```bash
-# Android
-npm run android
-
-# iOS
-npm run ios
-
-# Web (for testing)
-npm run web
-```
-
-## 📱 Usage
-
-### **First Time Setup**
-1. **Create Account**: Register with email and password
-2. **Setup Profile**: Add your name and preferences
-3. **Add Emergency Contacts**: Configure trusted contacts
-4. **Set Location Permissions**: Enable location services
-5. **Test SOS Feature**: Verify emergency functionality
-
-### **Daily Usage**
-1. **Plan Routes**: Use the navigation tab for safe routing
-2. **Monitor Safety**: Check area safety scores
-3. **Emergency Access**: Use SOS button or shake feature
-4. **Manage Data**: Update contacts and addresses as needed
-
-## 🗂️ Project Structure
-
-```
-SafeRouteExpo/
-├── src/
-│   ├── screens/
-│   │   ├── auth/                    # Authentication screens
-│   │   │   ├── LoginScreen.tsx
-│   │   │   └── SignupScreen.tsx
-│   │   ├── profile/                 # Profile management screens
-│   │   │   ├── EditProfileScreen.tsx
-│   │   │   ├── EmergencyContactsScreen.tsx
-│   │   │   └── SavedAddressesScreen.tsx
-│   │   ├── MapScreen.tsx            # Main navigation screen
-│   │   └── ProfileScreen.tsx        # User profile screen
-│   │
-│   ├── navigation/
-│   │   └── ProfileStack.tsx         # Profile navigation stack
-│   │
-│   ├── context/
-│   │   ├── AuthContext.tsx          # Authentication state
-│   │   ├── ThemeContext.tsx         # Theme management
-│   │   └── SOSContext.tsx           # Emergency features
-│   │
-│   ├── services/
-│   │   ├── sqlite.ts                # Database operations
-│   │   ├── firebaseClient.ts        # Auth service (SQLite backend)
-│   │   ├── userService.ts           # User management
-│   │   ├── profileService.ts        # Profile operations
-│   │   ├── addressService.ts        # Address management
-│   │   └── contactsService.ts       # Emergency contacts
-│   │
-│   ├── features/
-│   │   └── sos/
-│   │       └── useShakeSOS.ts       # Shake detection hook
-│   │
-│   └── utils/
-│       └── safetyAnalysis.ts        # Safety scoring utilities
-│
-├── assets/                          # Static assets
-├── docs/                           # Documentation files
-├── App.tsx                         # Main app component
-├── index.ts                        # Entry point
-├── app.config.ts                   # Expo configuration
-├── package.json                    # Dependencies
-└── tsconfig.json                   # TypeScript configuration
-```
-
-## 🔒 Security Features
-
-- **Password Hashing**: SHA-256 with salt
-- **Session Management**: Secure token-based authentication
-- **Local Storage**: SQLite database with proper data isolation
-- **Permission Management**: Granular location & sensor permissions
-
-## 📊 Database Schema
-
-See `docs/DATABASE_SCHEMA.md` for detailed database structure.
-
-## 🔗 API Documentation
-
-See `docs/API_DOCUMENTATION.md` for complete API reference.
-
-## 🎨 Architecture Diagram
-
-See `docs/ARCHITECTURE_DIAGRAM.md` for visual system overview.
-
-## 🧪 Testing
-
-```bash
-# Run the app in development mode
-npm start
-
-# Test on physical device using Expo Go
-# Scan QR code from terminal
-
-# Test specific platforms
-npm run android  # Android emulator
-npm run ios      # iOS simulator
-npm run web      # Web browser
-```
-
-## 🚀 Deployment
-
-### **Build for Production**
-```bash
-# Build Android APK
-expo build:android
-
-# Build iOS IPA
-expo build:ios
-
-# Or using EAS Build (recommended)
-npx eas-cli build
-```
-
-## 📈 Performance Optimizations
-
-- **Offline-first**: SQLite database for local data
-- **Lazy Loading**: Screen-based code splitting
-- **Optimized Images**: Compressed assets
-- **Memory Management**: Proper cleanup of subscriptions
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 📞 Support
-
-For support, please contact:
-- **Developer**: Paarth Goswami
-- **Email**: paarthgoswami44@gmail.com
-
-## 🔄 Version History
-
-### v1.0.0 (Current)
-- Initial release
-- SQLite-based authentication
-- Emergency contact management
-- Real-time location tracking
-- Cross-platform compatibility
+</div>
 
 ---
 
-**Built with ❤️ using React Native & Expo**
+## ⚜️ The Problem
+In an era of increasing uncertainty, personal safety apps often suffer from three critical failures:
+1.  **Isolation:** Victims often feel alone, silenced by stigma and unable to share their stories.
+2.  **Latency:** Seconds matter, yet most apps rely on slow mechanisms to contact help.
+3.  **Trust:** Digital evidence is easily tampered with, rendering it inadmissible in court.
+
+## 💎 The Solution
+**Guardian Angel** is not just an app; it is a holistic **Safety Ecosystem** built on **Three Pillars of Defense**:
+1.  **The Shield:** An offline-first mobile sentinel for immediate protection.
+2.  **The Sword:** A real-time command center (Cortex) for rapid police response.
+3.  **The Sanctuary:** A support community connecting survivors, NGOs, and lawyers.
+
+---
+
+## 🏛️ The Three Pillars of Architecture
+
+### 📱 1. The Shield (Mobile Sentinel)
+Built on **Expo & React Native**, designed for extreme reliability under pressure.
+*   **Zero-Latency Dispatch:** WebSockets ensure police see an SOS the millisecond it happens.
+*   **Cryptographic Chain of Custody:** Every audio recording is hashed (SHA-256) at the source to prevent tampering.
+*   **Tactical Simplicity:** Shake-to-SOS and Voice Activation for hands-free triggering.
+
+### �️ 2. The Sword (Cortex Dashboard)
+A **Vite + React 19** command center designed for authorities.
+*   **Real-time Intel:** Live tracking of all active distress signals on a tactical map.
+*   **Data Visualization:** Heatmaps of high-risk zones powered by `Recharts`.
+*   **Instant Dispatch:** Police response updates are pushed to the user's phone instantly.
+
+### 🤝 3. The Sanctuary (Community & Support)
+A safe, anonymous space for empowerment and justice.
+*   **Anonymous Chronicles:** Women can share past experiences or unsafe locations without revealing their identity.
+*   **Direct Aid:** Verified **NGOs** and **Lawyers** are integrated into the platform to offer pro-bono legal counsel and counseling directly to those asking for help.
+*   **Solidarity Network:** Users can warn others about specific "unsafe zones," crowd-sourcing safety intelligence.
+
+---
+
+## 🌟 Premium Features
+
+### 🔐 Blockchain-Ready Integrity
+We don't just "save" evidence; we seal it.
+*   **Hash-on-Capture:** A SHA-256 digital fingerprint is generated the moment audio is recorded.
+*   **Immutable Record:** This hash is stored in our database, creating a verifiable link to the original file.
+
+### ⚡ Bi-Directional Realtime Sync
+*   **Instant Alert:** Victim triggers SOS ➡️ Police Dashboard rings (<200ms).
+*   **Live Feedback:** Police mark "Dispatched" ➡️ Victim's phone vibrates with "Help is on the way."
+
+### 📡 Offline-First Resilience
+*   **No Internet? No Problem.** Evidence is cached locally and auto-retries when connectivity returns.
+*   **Local Fallbacks:** SMS and Flashlight SOS modes function even without data.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+*   Node.js v18+
+*   Expo Go (on your mobile device)
+
+### Installation
+
+**1. Clone the Ecosystem**
+```bash
+git clone https://github.com/Rohanx777/amba.git
+cd amba
+```
+
+**2. Ignite The Shield (Mobile App)**
+```bash
+cd SafeRouteExpo-2.3
+npm install
+npx expo start
+```
+
+**3. Launch The Sword (Dashboard)**
+```bash
+cd AMBA_POLICE_DASHBOARD-main
+npm install
+npm run dev
+```
+
+---
+
+## 🔮 Future Roadmap
+
+*   **Drone Integration:** Autonomous drone dispatch upon verified SOS.
+*   **AI Threat Detection:** Audio analysis to detect gunshots or screams automatically.
+*   **Public Ledger Anchoring:** Anchoring evidence hashes to Polygon for decentralized proof.
+*   **Offline Mesh Networking:** Connecting devices via Bluetooth Bridge when cellular towers are down.
+
+---
+
+<div align="center">
+
+### 💻 Developed by Team H4CK2CR4CK
+
+**Paarth Goswami** • **Saksham Goswami** • **Rohan Singh** • **Ankit Sharma**
+
+*Submitted for HACK KRMU 5.0*
+
+</div>
