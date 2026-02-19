@@ -1,58 +1,132 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
 import { getProfile, upsertProfile } from '../../services/profileService';
+import { ScreenLayout } from '../../components/ScreenLayout';
+import { GuardianHeader } from '../../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../../theme/guardianTheme';
+import { User, Save } from 'lucide-react-native';
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, profile, updateProfile } = useAuth();
-  const { colors } = useTheme();
   const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setFullName(profile?.full_name || '');
   }, [profile?.full_name]);
 
   const onSave = async () => {
+    if (!fullName.trim()) {
+      Alert.alert("Error", "Name cannot be empty");
+      return;
+    }
+    setIsLoading(true);
     try {
       await updateProfile({ full_name: fullName });
       Alert.alert('Saved', 'Profile updated successfully');
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Could not save');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <LinearGradient colors={[colors.background, colors.backgroundLight]} style={styles.container}>
-      <View style={styles.inner}>
-        <Text style={[styles.title, { color: colors.text }]}>Edit Profile</Text>
+    <ScreenLayout>
+      <GuardianHeader
+        title="Edit Profile"
+        isBack
+        onBackPress={() => navigation.goBack()}
+      />
 
-        <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.backgroundCard, color: colors.text, borderColor: 'rgba(255,255,255,0.1)' }]}
-          placeholder="Full Name"
-          placeholderTextColor={colors.textMuted}
-          value={fullName}
-          onChangeText={setFullName}
-        />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <View style={styles.card}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={styles.inputWrapper}>
+              <User size={20} color={COLORS.textTertiary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your full name"
+                placeholderTextColor={COLORS.textTertiary}
+                value={fullName}
+                onChangeText={setFullName}
+                autoCapitalize="words"
+              />
+            </View>
+          </View>
 
-        <TouchableOpacity onPress={onSave}>
-          <LinearGradient colors={[colors.primary, colors.secondary]} style={styles.saveBtn}>
-            <Text style={{ color: colors.text, fontWeight: '800' }}>Save</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    </LinearGradient>
+          <TouchableOpacity
+            onPress={onSave}
+            style={[styles.saveBtn, isLoading && { opacity: 0.7 }]}
+            disabled={isLoading}
+          >
+            <Save size={20} color="white" />
+            <Text style={styles.saveBtnText}>{isLoading ? 'Saving...' : 'Save Changes'}</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  inner: { flex: 1, padding: 20, paddingTop: 40 },
-  title: { fontSize: 24, fontWeight: '900', marginBottom: 16 },
-  label: { fontSize: 14, marginBottom: 8 },
-  input: { height: 52, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, marginBottom: 16 },
-  saveBtn: { height: 52, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  container: {
+    padding: SPACING.l,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: RADIUS.l,
+    padding: SPACING.l,
+    marginTop: SPACING.m,
+    ...SHADOWS.card,
+  },
+  inputGroup: {
+    marginBottom: SPACING.l,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.s,
+    marginLeft: SPACING.xs,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.m,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.m,
+  },
+  inputIcon: {
+    marginRight: SPACING.s,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    height: 52,
+    borderRadius: RADIUS.m,
+    gap: SPACING.s,
+    ...SHADOWS.glow,
+  },
+  saveBtnText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

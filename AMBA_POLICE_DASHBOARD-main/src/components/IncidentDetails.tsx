@@ -1,11 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import type { Alert, PoliceResponse } from '../types';
 import { usePoliceActions } from '../hooks/usePoliceActions';
+import { useEvidence } from '../hooks/useEvidence';
+import type { AudioFile } from '../hooks/useEvidence';
 import {
     X, Battery, Phone, MapPin, AlertTriangle,
     CheckCircle, Loader2, Navigation, Wifi,
-    Send, Truck, MapPinned, Shield, Clock
+    Send, Truck, MapPinned, Shield, Clock,
+    Mic
 } from 'lucide-react';
 
 interface IncidentDetailsProps {
@@ -30,7 +32,10 @@ const TIMELINE_COLORS: Record<string, string> = {
 
 const IncidentDetails: React.FC<IncidentDetailsProps> = ({ alert, onClose, onResolve }) => {
     const { respondToAlert, getResponses } = usePoliceActions();
+    const { getAudioFiles } = useEvidence();
+
     const [responses, setResponses] = useState<PoliceResponse[]>([]);
+    const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     const displayName = alert.profiles?.full_name || alert.user_name || 'Unknown';
@@ -39,10 +44,11 @@ const IncidentDetails: React.FC<IncidentDetailsProps> = ({ alert, onClose, onRes
     const displayBattery = alert.battery != null && alert.battery >= 0 ? Math.round(alert.battery * 100) : null;
     const isActive = alert.status === 'ACTIVE';
 
-    // Fetch response timeline
+    // Fetch data
     useEffect(() => {
         getResponses(alert.id).then(setResponses).catch(console.error);
-    }, [alert.id, getResponses]);
+        getAudioFiles(alert.id).then(setAudioFiles).catch(console.error);
+    }, [alert.id, getResponses, getAudioFiles]);
 
     async function handleAction(action: 'DISPATCHED' | 'EN_ROUTE' | 'ON_SCENE' | 'RESOLVED') {
         setActionLoading(action);
@@ -145,6 +151,39 @@ const IncidentDetails: React.FC<IncidentDetailsProps> = ({ alert, onClose, onRes
                         {alert.latitude?.toFixed(6)}, {alert.longitude?.toFixed(6)}
                     </p>
                 </div>
+
+                {/* AUDIO EVIDENCE SECTION */}
+                {audioFiles.length > 0 && (
+                    <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/50">
+                        <h4 className="text-[10px] text-red-400 uppercase font-bold mb-3 flex items-center gap-1.5">
+                            <Mic className="w-3 h-3" /> Audio Evidence
+                        </h4>
+                        <div className="space-y-2">
+                            {audioFiles.map((file) => (
+                                <div key={file.id} className="flex items-center justify-between bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                                            <Mic className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-200">
+                                                {file.duration || 'Unknown Duration'}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                {new Date(file.recorded_at).toLocaleTimeString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {file.signedUrl ? (
+                                        <audio controls src={file.signedUrl} className="h-8 w-24" />
+                                    ) : (
+                                        <span className="text-xs text-red-500">Link Expired</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Response Timeline */}
                 {responses.length > 0 && (

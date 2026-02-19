@@ -14,13 +14,16 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../services/supabaseClient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Battery, Zap, Navigation, MapPin, Signal } from 'lucide-react-native';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { GuardianHeader } from '../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
-// Tactical Silver Map Style
+// Tactical Silver Map Style - Compatible with Light Theme
 const SILVER_MAP_STYLE = [
     { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
     { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
@@ -31,7 +34,7 @@ const SILVER_MAP_STYLE = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] }
 ];
 
-const GuardianScreen = () => {
+const GuardianScreen = ({ navigation }: any) => {
     const [targetUid, setTargetUid] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const [childData, setChildData] = useState<any>(null);
@@ -128,9 +131,9 @@ const GuardianScreen = () => {
 
     // 3. Format Telemetry
     const getBatteryColor = (level: number) => {
-        if (level < 0) return '#9ca3af';
-        if (level <= 0.2) return '#ef4444';
-        return '#22c55e';
+        if (level < 0) return COLORS.textTertiary;
+        if (level <= 0.2) return COLORS.danger;
+        return COLORS.success;
     };
 
     const formatTime = (timestamp: any) => {
@@ -153,20 +156,22 @@ const GuardianScreen = () => {
     // --- RENDER: CONNECTION SCREEN ---
     if (!isConnected) {
         return (
-            <SafeAreaView style={styles.container}>
+            <ScreenLayout>
+                <GuardianHeader title="Guardian Center" subtitle="Tactical Overwatch" isBack onBackPress={() => navigation.goBack()} />
+
                 <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.loginContent}>
                     <View style={styles.iconContainer}>
-                        <Signal size={64} color="#ef4444" />
+                        <Signal size={64} color={COLORS.primary} />
                     </View>
 
-                    <Text style={styles.title}>GUARDIAN<Text style={styles.titleBold}>CENTER</Text></Text>
-                    <Text style={styles.subtitle}>Tactical Overwatch System</Text>
+                    <Text style={styles.title}>GUARDIAN<Text style={styles.titleBold}>LINK</Text></Text>
+                    <Text style={styles.subtitle}>Enter Target ID to Establish Uplink</Text>
 
                     <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
-                            placeholder="Enter Target User ID"
-                            placeholderTextColor="#6b7280"
+                            placeholder="Target User ID"
+                            placeholderTextColor={COLORS.textTertiary}
                             value={targetUid}
                             onChangeText={setTargetUid}
                             autoCapitalize="none"
@@ -174,10 +179,15 @@ const GuardianScreen = () => {
                     </View>
 
                     <TouchableOpacity style={styles.connectButton} onPress={handleConnect}>
-                        <Text style={styles.connectButtonText}>ESTABLISH UPLINK</Text>
+                        <LinearGradient
+                            colors={[COLORS.primary, COLORS.primaryLight]}
+                            style={styles.connectGradient}
+                        >
+                            <Text style={styles.connectButtonText}>CONNECT TO TARGET</Text>
+                        </LinearGradient>
                     </TouchableOpacity>
                 </KeyboardAvoidingView>
-            </SafeAreaView>
+            </ScreenLayout>
         );
     }
 
@@ -188,6 +198,11 @@ const GuardianScreen = () => {
 
     return (
         <View style={styles.mapContainer}>
+            {/* Header Overlay */}
+            <View style={styles.headerOverlay}>
+                <GuardianHeader title="Live Tracking" subtitle="Active Monitoring" isBack onBackPress={() => setIsConnected(false)} />
+            </View>
+
             <MapView
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
@@ -205,12 +220,12 @@ const GuardianScreen = () => {
                 {childCoords && (
                     <Marker
                         coordinate={{ latitude: childCoords.latitude, longitude: childCoords.longitude }}
-                        title="Target (Child)"
+                        title="Target"
                         description={`Speed: ${speed} km/h`}
                     >
                         <View style={styles.markerContainer}>
-                            <View style={[styles.pulseRing, { borderColor: '#ef4444' }]} />
-                            <View style={[styles.markerDot, { backgroundColor: '#ef4444' }]} />
+                            <View style={[styles.pulseRing, { borderColor: COLORS.danger }]} />
+                            <View style={[styles.markerDot, { backgroundColor: COLORS.danger }]} />
                         </View>
                     </Marker>
                 )}
@@ -222,7 +237,7 @@ const GuardianScreen = () => {
                             { latitude: myLocation.latitude, longitude: myLocation.longitude },
                             { latitude: childCoords.latitude, longitude: childCoords.longitude }
                         ]}
-                        strokeColor="#3b82f6"
+                        strokeColor={COLORS.primary}
                         strokeWidth={4}
                         lineDashPattern={[10, 5]}
                     />
@@ -235,8 +250,8 @@ const GuardianScreen = () => {
                     {/* Header */}
                     <View style={styles.hudHeader}>
                         <View style={styles.statusBadge}>
-                            <View style={styles.liveDot} />
-                            <Text style={styles.statusText}>LIVE TRACKING</Text>
+                            <View style={[styles.liveDot, { backgroundColor: COLORS.success }]} />
+                            <Text style={[styles.statusText, { color: COLORS.success }]}>LIVE TRACKING</Text>
                         </View>
                         <Text style={styles.lastUpdated}>{formatTime(childData?.last_updated)}</Text>
                     </View>
@@ -247,7 +262,7 @@ const GuardianScreen = () => {
                         <View style={styles.statItem}>
                             <View style={styles.statLabelRow}>
                                 <Battery size={16} color={getBatteryColor(batteryLevel)} />
-                                <Text style={styles.statLabel}>PROXIMITY FUEL</Text>
+                                <Text style={styles.statLabel}>BATTERY</Text>
                             </View>
                             <Text style={[styles.statValue, { color: getBatteryColor(batteryLevel) }]}>
                                 {batteryLevel >= 0 ? `${Math.round(batteryLevel * 100)}%` : '--'}
@@ -259,8 +274,8 @@ const GuardianScreen = () => {
                         {/* Speed */}
                         <View style={styles.statItem}>
                             <View style={styles.statLabelRow}>
-                                <Zap size={16} color="#3b82f6" />
-                                <Text style={styles.statLabel}>VELOCITY</Text>
+                                <Zap size={16} color={COLORS.primary} />
+                                <Text style={styles.statLabel}>SPEED</Text>
                             </View>
                             <Text style={styles.statValue}>
                                 {speed} <Text style={styles.unit}>km/h</Text>
@@ -269,7 +284,7 @@ const GuardianScreen = () => {
                     </View>
 
                     <View style={styles.locationRow}>
-                        <MapPin size={16} color="#9ca3af" />
+                        <MapPin size={16} color={COLORS.textTertiary} />
                         <Text style={styles.coordText}>
                             {childCoords?.latitude.toFixed(5)}, {childCoords?.longitude.toFixed(5)}
                         </Text>
@@ -277,8 +292,13 @@ const GuardianScreen = () => {
 
                     {/* Navigation Button */}
                     <TouchableOpacity style={styles.navButton} onPress={handleNavigation}>
-                        <Navigation size={20} color="#fff" fill="#fff" />
-                        <Text style={styles.navButtonText}>NAVIGATE TO TARGET</Text>
+                        <LinearGradient
+                            colors={[COLORS.primary, COLORS.primaryLight]}
+                            style={styles.navGradient}
+                        >
+                            <Navigation size={20} color="#fff" fill="#fff" />
+                            <Text style={styles.navButtonText}>NAVIGATE TO TARGET</Text>
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -287,42 +307,54 @@ const GuardianScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#111827' },
-    loginContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-    iconContainer: { marginBottom: 20, backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 20, borderRadius: 50 },
-    title: { fontSize: 28, color: '#fff', fontWeight: '300', letterSpacing: 2 },
-    titleBold: { fontWeight: '900', color: '#ef4444' },
-    subtitle: { color: '#9ca3af', marginTop: 8, textTransform: 'uppercase', letterSpacing: 1, fontSize: 12 },
+    loginContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.l },
+    iconContainer: {
+        marginBottom: SPACING.l,
+        backgroundColor: COLORS.background,
+        padding: SPACING.l,
+        borderRadius: RADIUS.full,
+        ...SHADOWS.soft
+    },
+    title: { fontSize: 28, color: COLORS.text, fontWeight: '300', letterSpacing: 2 },
+    titleBold: { fontWeight: '900', color: COLORS.primary },
+    subtitle: { color: COLORS.textSecondary, marginTop: 8, textTransform: 'uppercase', letterSpacing: 1, fontSize: 12 },
 
-    inputContainer: { width: '100%', marginTop: 40 },
+    inputContainer: { width: '100%', marginTop: SPACING.xl },
     input: {
-        backgroundColor: '#1f2937',
-        color: '#fff',
-        padding: 16,
-        borderRadius: 12,
+        backgroundColor: COLORS.card,
+        color: COLORS.text,
+        padding: SPACING.m,
+        borderRadius: RADIUS.m,
         borderWidth: 1,
-        borderColor: '#374151',
+        borderColor: COLORS.border,
         textAlign: 'center',
         fontSize: 18,
-        letterSpacing: 1
+        letterSpacing: 1,
+        ...SHADOWS.soft,
     },
 
     connectButton: {
-        marginTop: 20,
-        backgroundColor: '#ef4444',
-        paddingVertical: 16,
-        paddingHorizontal: 40,
-        borderRadius: 12,
+        marginTop: SPACING.l,
         width: '100%',
+        ...SHADOWS.glow,
+    },
+    connectGradient: {
+        paddingVertical: SPACING.m,
+        paddingHorizontal: SPACING.xl,
+        borderRadius: RADIUS.m,
         alignItems: 'center',
-        shadowColor: '#ef4444',
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
     },
     connectButtonText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 1 },
 
     mapContainer: { flex: 1 },
     map: { width: '100%', height: '100%' },
+    headerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+    },
 
     markerContainer: { alignItems: 'center', justifyContent: 'center' },
     markerDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#fff' },
@@ -337,53 +369,48 @@ const styles = StyleSheet.create({
 
     hudContainer: {
         position: 'absolute',
-        bottom: 40,
-        left: 20,
-        right: 20,
+        bottom: SPACING.xl,
+        left: SPACING.m,
+        right: SPACING.m,
         alignItems: 'center',
     },
     hudCard: {
         width: '100%',
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        borderRadius: 20,
-        padding: 20,
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.l,
+        padding: SPACING.m,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
+        borderColor: COLORS.border,
+        ...SHADOWS.card,
     },
-    hudHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(34, 197, 94, 0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e', marginRight: 6 },
-    statusText: { color: '#22c55e', fontWeight: 'bold', fontSize: 10, letterSpacing: 0.5 },
-    lastUpdated: { color: '#6b7280', fontSize: 12 },
+    hudHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.m },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.s },
+    liveDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+    statusText: { fontWeight: 'bold', fontSize: 10, letterSpacing: 0.5 },
+    lastUpdated: { color: COLORS.textTertiary, fontSize: 12 },
 
     statsGrid: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
     statItem: { alignItems: 'center' },
     statLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 4 },
-    statLabel: { color: '#6b7280', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-    statValue: { color: '#fff', fontSize: 24, fontWeight: '800' },
-    unit: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-    divider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.1)' },
+    statLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+    statValue: { color: COLORS.text, fontSize: 24, fontWeight: '800' },
+    unit: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+    divider: { width: 1, height: 40, backgroundColor: COLORS.border },
 
-    locationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, gap: 6 },
-    coordText: { color: '#9ca3af', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+    locationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: SPACING.m, gap: 6 },
+    coordText: { color: COLORS.textTertiary, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
 
     navButton: {
-        marginTop: 20,
-        backgroundColor: '#3b82f6',
-        paddingVertical: 14,
-        borderRadius: 12,
+        marginTop: SPACING.m,
+        ...SHADOWS.soft,
+    },
+    navGradient: {
+        paddingVertical: SPACING.m,
+        borderRadius: RADIUS.m,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
     },
     navButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14, letterSpacing: 1 },
 });

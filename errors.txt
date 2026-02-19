@@ -1,0 +1,5 @@
+App.tsx(175,6): error TS2304: Cannot find name 'MenuContext'.
+App.tsx(200,7): error TS2304: Cannot find name 'MenuContext'.
+src/screens/HomeScreen.tsx(12,10): error TS2614: Module '"../../App"' has no exported member 'MenuContext'. Did you mean to use 'import MenuContext from "../../App"' instead?
+src/screens/HomeScreen.tsx(18,13): error TS2339: Property 'toggleMenu' does not exist on type 'unknown'.
+src/screens/ProfileScreen.tsx(33,45): error TS2344: Type '"Profile"' does not satisfy the constraint 'keyof RootTabParamList'.

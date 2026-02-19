@@ -24,40 +24,57 @@ function normalizePhone(phone: string) {
 }
 
 // ─── FETCH ────────────────────────────────────────────
+// ─── FETCH ────────────────────────────────────────────
 export async function fetchContacts(userId: string): Promise<EmergencyContact[]> {
   try {
-    // Try Supabase first
-    const { data, error } = await supabase
+    // 1. Try Supabase
+    const { data: supaData, error: supaError } = await supabase
       .from('emergency_contacts')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (data && !error) {
+    if (!supaError && supaData && supaData.length > 0) {
+      console.log(`[ContactsService] Fetched ${supaData.length} from Supabase.`);
+
       // Sync cloud data to local SQLite cache
-      for (const c of data) {
-        await run(
-          'INSERT OR REPLACE INTO emergency_contacts (id, user_id, name, phone, relation, is_primary, avatar_uri, is_active_simulated, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [c.id, c.user_id, c.name, c.phone, c.relation, c.is_primary ? 1 : 0, c.avatar_url || null, 0, Date.now()]
-        );
-      }
+      // We do this asynchronously so we don't block return
+      (async () => {
+        for (const c of supaData) {
+          await run(
+            'INSERT OR REPLACE INTO emergency_contacts (id, user_id, name, phone, relation, is_primary, avatar_uri, is_active_simulated, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [c.id, c.user_id, c.name, c.phone, c.relation, c.is_primary ? 1 : 0, c.avatar_url || null, 0, Date.now()]
+          );
+        }
+      })();
+
       // Map Supabase fields to app type
-      return data.map((c: any) => ({
+      return supaData.map((c: any) => ({
         ...c,
         avatar_uri: c.avatar_url,         // map cloud field to local field name
         is_primary: c.is_primary ? 1 : 0,
         is_active_simulated: 0,
       })) as EmergencyContact[];
+    } else {
+      console.log('[ContactsService] Supabase returned empty/error, checking SQLite fallback...');
     }
   } catch (e) {
-    console.log('Supabase contacts fetch failed, using local:', e);
+    console.log('[ContactsService] Supabase contacts fetch failed, using local:', e);
   }
 
-  // Offline fallback
-  return await query<EmergencyContact>(
-    'SELECT id, user_id, name, phone, relation, is_primary, avatar_uri, is_active_simulated, created_at FROM emergency_contacts WHERE user_id = ? ORDER BY created_at DESC',
-    [userId]
-  );
+  // 2. Offline / Empty Cloud Fallback
+  // If Supabase was empty or failed, we MUST check SQLite.
+  try {
+    const localData = await query<EmergencyContact>(
+      'SELECT id, user_id, name, phone, relation, is_primary, avatar_uri, is_active_simulated, created_at FROM emergency_contacts WHERE user_id = ? ORDER BY created_at DESC',
+      [userId]
+    );
+    console.log(`[ContactsService] Fetched ${localData.length} from SQLite.`);
+    return localData;
+  } catch (err) {
+    console.error('[ContactsService] SQLite fetch failed:', err);
+    return [];
+  }
 }
 
 // ─── ADD ──────────────────────────────────────────────

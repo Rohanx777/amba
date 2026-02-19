@@ -31,6 +31,7 @@ const defineConfig = (): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     edgeToEdgeEnabled: true,
+    softwareKeyboardLayoutMode: 'pan',
     predictiveBackGestureEnabled: false,
     config: {
       googleMaps: {

@@ -23,16 +23,19 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  Easing,
   FadeInDown
 } from 'react-native-reanimated';
+
+import { ScreenLayout } from '../components/ScreenLayout';
+import { GuardianHeader } from '../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
+import { MenuContext } from '../context/MenuContext';
 
 const { width } = Dimensions.get('window');
 
 // Grid Configuration
-const GAP = 15;
-const PADDING = 20;
-const TILE_SIZE = (width - PADDING * 2 - GAP) / 2;
+const GAP = SPACING.m;
+const TILE_SIZE = (width - (SPACING.l * 2) - GAP) / 2;
 
 interface Recording {
   uri: string;
@@ -42,6 +45,7 @@ interface Recording {
 
 export default function SafetyScreen() {
   const navigation = useNavigation<any>();
+  const { toggleMenu } = React.useContext(MenuContext);
 
   // State
   const [sirenPlaying, setSirenPlaying] = useState(false);
@@ -59,30 +63,21 @@ export default function SafetyScreen() {
   // Refs
   const soundRef = useRef<Audio.Sound | null>(null);
   const playbackRef = useRef<Audio.Sound | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Stop siren
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-      // Stop playback
-      if (playbackRef.current) {
-        playbackRef.current.unloadAsync();
-      }
-      // Stop recording if active
-      if (recording) {
-        recording.stopAndUnloadAsync();
-      }
+      if (soundRef.current) soundRef.current.unloadAsync();
+      if (playbackRef.current) playbackRef.current.unloadAsync();
+      if (recordingRef.current) recordingRef.current.stopAndUnloadAsync();
     };
   }, []);
 
-  // --- 1. Siren Logic (Fixed) ---
+  // --- 1. Siren Logic ---
   const toggleSiren = async () => {
     try {
       if (sirenPlaying) {
-        // Stop
         if (soundRef.current) {
           await soundRef.current.stopAsync();
           await soundRef.current.unloadAsync();
@@ -90,8 +85,6 @@ export default function SafetyScreen() {
         }
         setSirenPlaying(false);
       } else {
-        // Play
-        // Using local asset for offline reliability
         console.log("🔊 LOADING SAFETY SCREEN SIREN: siren.mp3");
         const { sound } = await Audio.Sound.createAsync(
           require('../../assets/siren.mp3'),
@@ -123,41 +116,36 @@ export default function SafetyScreen() {
   // --- 3. Audio Recording Logic ---
   const toggleRecording = async () => {
     try {
-      if (recording) {
-        // Stop recording
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
-
-        // Add to list
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync();
+        const uri = recordingRef.current.getURI();
         if (uri) {
           const newRecording: Recording = {
             uri,
             date: new Date().toLocaleTimeString(),
-            duration: '00:??', // Duration logic requires status update listener, skipping for mvp
+            duration: '00:??',
           };
           setRecordings(prev => [newRecording, ...prev]);
         }
-
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-        setRecording(null);
+        recordingRef.current = null;
+        setRecording(null); // Keep for UI state if needed, or remove
         setIsRecording(false);
         Alert.alert("Saved", "Audio evidence saved securely.");
       } else {
-        // Start recording
         const { status } = await Audio.requestPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert("Permission", "Microphone access is required.");
           return;
         }
-
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
         });
-
         const { recording: newRecording } = await Audio.Recording.createAsync(
           Audio.RecordingOptionsPresets.HIGH_QUALITY
         );
+        recordingRef.current = newRecording;
         setRecording(newRecording);
         setIsRecording(true);
       }
@@ -174,20 +162,17 @@ export default function SafetyScreen() {
         playbackRef.current = null;
         setPlayingUri(null);
       }
-
       const { sound } = await Audio.Sound.createAsync(
         { uri },
         { shouldPlay: true }
       );
       playbackRef.current = sound;
       setPlayingUri(uri);
-
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlayingUri(null);
         }
       });
-
     } catch (error) {
       Alert.alert("Error", "Could not play audio.");
     }
@@ -218,7 +203,6 @@ export default function SafetyScreen() {
     extraIcon,
     onExtraPress,
     IconComponent,
-    style
   }: {
     title: string,
     icon: any,
@@ -227,57 +211,79 @@ export default function SafetyScreen() {
     isActive: boolean,
     extraIcon?: string,
     onExtraPress?: () => void,
-    IconComponent?: any, // Allow optional icon component
-    style?: any // Allow style override
+    IconComponent?: any,
   }) => {
     const IconLib = IconComponent || Ionicons;
+
     return (
-      <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-        <BlurView intensity={20} tint="dark" style={[styles.tile, style, isActive && { borderColor: color, borderWidth: 2 }]}>
-          {isActive && <PulseIndicator color={color} />}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={onPress}
+        style={[
+          styles.tile,
+          isActive && { borderColor: color, borderWidth: 2, backgroundColor: color + '10' }
+        ]}
+      >
+        <LinearGradient
+          colors={['#FFFFFF', '#F8FAFC']}
+          style={StyleSheet.absoluteFill}
+        />
 
-          {extraIcon && (
-            <TouchableOpacity style={styles.extraBtn} onPress={onExtraPress}>
-              <Ionicons name={extraIcon as any} size={20} color="#FFF" />
-            </TouchableOpacity>
-          )}
+        {isActive && <PulseIndicator color={color} />}
 
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-            <IconLib name={icon} size={40} color={isActive ? color : '#FFF'} />
-          </View>
+        {extraIcon && (
+          <TouchableOpacity style={styles.extraBtn} onPress={onExtraPress}>
+            <View style={[styles.extraIconBg, { backgroundColor: color }]}>
+              <Ionicons name={extraIcon as any} size={14} color="#FFF" />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.iconContainer, { backgroundColor: isActive ? color : COLORS.background }]}>
+          <IconLib name={icon} size={32} color={isActive ? '#FFF' : color} />
+        </View>
+        <View>
           <Text style={[styles.tileTitle, isActive && { color: color }]}>{title}</Text>
-          <Text style={styles.tileStatus}>{isActive ? 'ACTIVE' : 'LOCATE'}</Text>
-        </BlurView>
+          <Text style={styles.tileStatus}>{isActive ? 'ACTIVE' : 'READY'}</Text>
+        </View>
       </TouchableOpacity>
     );
   };
 
   // --- Specialized Team Card ---
   const TeamCard = ({ onPress }: { onPress: () => void }) => (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-      <BlurView intensity={30} tint="dark" style={styles.teamCard}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.teamCard}>
+        <LinearGradient
+          colors={[COLORS.accentOrange, '#FFF7ED']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={styles.teamIconContainer}>
-          <Ionicons name="shield-half" size={32} color="#FF9F0A" />
+          <Ionicons name="shield-half" size={28} color="#EA580C" />
         </View>
         <View style={styles.teamContent}>
           <Text style={styles.teamTitle}>Trusted Team</Text>
           <Text style={styles.teamSubtitle}>Manage Emergency Contacts</Text>
         </View>
-        <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.3)" />
-      </BlurView>
+        <View style={styles.chevronContainer}>
+          <Ionicons name="chevron-forward" size={20} color="#EA580C" />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Background */}
-      <LinearGradient
-        colors={['#050505', '#1a0b2e', '#000000']}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
+    <ScreenLayout>
+      <GuardianHeader
+        title="Safety Tools"
+        subtitle="Tactical Response Toolkit"
+        onMenuPress={toggleMenu}
+        onNotificationPress={() => navigation.navigate('Notifications')}
+        hasNotifications
       />
 
-      {/* Hidden Camera for Flashlight (updated to CameraView) */}
+      {/* Hidden Camera for Flashlight */}
       {permissionResponse?.granted && (
         <CameraView
           style={{ height: 0, width: 0 }}
@@ -286,42 +292,36 @@ export default function SafetyScreen() {
         />
       )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Safety Tools</Text>
-          <Text style={styles.headerSubtitle}>Tactical Response Toolkit</Text>
-        </View>
-
-        {/* Grid */}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.gridContainer}>
           {/* Row 1: Team (Full Width) */}
           <View style={styles.row}>
             <Animated.View entering={FadeInDown.delay(100).springify()} style={{ width: '100%' }}>
-              <TeamCard onPress={() => navigation.navigate('Contacts')} />
+              <TeamCard onPress={() => navigation.navigate('MyTeam')} />
             </Animated.View>
           </View>
 
           {/* Row 2: Nearest Police & Hospital */}
           <View style={styles.row}>
-            {/* Tile 1: Nearest Police */}
             <Animated.View entering={FadeInDown.delay(200).springify()}>
               <Tile
-                title="Nearest Police"
+                title="Police"
                 icon="police-badge"
-                color="#007AFF"
+                color={COLORS.primary}
                 isActive={false}
                 onPress={() => navigation.navigate('NearbyPlaces', { type: 'police' })}
                 IconComponent={MaterialCommunityIcons}
               />
             </Animated.View>
 
-            {/* Tile 2: Nearest Hospital */}
             <Animated.View entering={FadeInDown.delay(300).springify()}>
               <Tile
-                title="Nearest Hospital"
+                title="Hospital"
                 icon="hospital-box"
-                color="#FF3B30"
+                color={COLORS.danger}
                 isActive={false}
                 onPress={() => navigation.navigate('NearbyPlaces', { type: 'hospital' })}
                 IconComponent={MaterialCommunityIcons}
@@ -331,23 +331,21 @@ export default function SafetyScreen() {
 
           {/* Row 3: Siren & Fake Call */}
           <View style={styles.row}>
-            {/* Tile 3: Siren */}
             <Animated.View entering={FadeInDown.delay(400).springify()}>
               <Tile
                 title="Siren Alert"
                 icon="megaphone-outline"
-                color="#FF0000"
+                color={COLORS.danger}
                 isActive={sirenPlaying}
                 onPress={toggleSiren}
               />
             </Animated.View>
 
-            {/* Tile 4: Fake Call */}
             <Animated.View entering={FadeInDown.delay(500).springify()}>
               <Tile
                 title="Fake Call"
                 icon="call-outline"
-                color="#39FF14"
+                color={COLORS.success}
                 isActive={false}
                 onPress={triggerFakeCall}
               />
@@ -356,23 +354,21 @@ export default function SafetyScreen() {
 
           {/* Row 4: Strobe & Evidence Rec */}
           <View style={styles.row}>
-            {/* Tile 5: Strobe Light */}
             <Animated.View entering={FadeInDown.delay(600).springify()}>
               <Tile
-                title="Strobe Light"
+                title="Strobe"
                 icon="flashlight-outline"
-                color="#FFFF00"
+                color={COLORS.warning}
                 isActive={flashlightOn}
                 onPress={toggleFlashlight}
               />
             </Animated.View>
 
-            {/* Tile 6: Evidence Rec */}
             <Animated.View entering={FadeInDown.delay(700).springify()}>
               <Tile
-                title="Evidence Rec"
+                title="Evidence"
                 icon="mic-outline"
-                color="#00F0FF"
+                color={COLORS.primary}
                 isActive={isRecording}
                 onPress={toggleRecording}
                 extraIcon="list"
@@ -382,83 +378,60 @@ export default function SafetyScreen() {
           </View>
         </View>
 
-        {/* Audio Recordings Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={audioModalVisible}
-          onRequestClose={() => setAudioModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <BlurView intensity={50} tint="dark" style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Evidence Log</Text>
-                <TouchableOpacity onPress={() => setAudioModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-
-              <FlatList
-                data={recordings}
-                keyExtractor={(item) => item.uri}
-                ListEmptyComponent={<Text style={styles.emptyText}>No recordings yet.</Text>}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.recordingItem}
-                    onPress={() => playRecording(item.uri)}
-                  >
-                    <View style={styles.recordingIcon}>
-                      <Ionicons
-                        name={playingUri === item.uri ? "pause" : "play"}
-                        size={20}
-                        color="#00F0FF"
-                      />
-                    </View>
-                    <View>
-                      <Text style={styles.recordingText}>Audio Evidence</Text>
-                      <Text style={styles.recordingSubtext}>{item.date}</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            </BlurView>
-          </View>
-        </Modal>
-
         <View style={styles.footerNote}>
-          <Ionicons name="shield-checkmark" size={16} color="rgba(255,255,255,0.3)" />
+          <Ionicons name="shield-checkmark" size={14} color={COLORS.textTertiary} />
           <Text style={styles.footerText}>Secure & Encrypted Tools</Text>
         </View>
       </ScrollView>
-    </View >
+
+      {/* Audio Recordings Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={audioModalVisible}
+        onRequestClose={() => setAudioModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Evidence Log</Text>
+              <TouchableOpacity onPress={() => setAudioModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={recordings}
+              keyExtractor={(item) => item.uri}
+              ListEmptyComponent={<Text style={styles.emptyText}>No recordings yet.</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.recordingItem}
+                  onPress={() => playRecording(item.uri)}
+                >
+                  <View style={[styles.recordingIcon, { backgroundColor: COLORS.primaryPale }]}>
+                    <Ionicons
+                      name={playingUri === item.uri ? "pause" : "play"}
+                      size={18}
+                      color={COLORS.primary}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.recordingText}>Audio Evidence</Text>
+                    <Text style={styles.recordingSubtext}>{item.date}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#050505',
-  },
-  header: {
-    marginTop: 60,
-    marginBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginTop: 4,
-  },
   gridContainer: {
-    paddingHorizontal: PADDING,
     gap: GAP,
   },
   row: {
@@ -468,151 +441,167 @@ const styles = StyleSheet.create({
   },
   tile: {
     width: TILE_SIZE,
-    height: TILE_SIZE * 1.2,
-    borderRadius: 24,
-    padding: 20,
+    height: TILE_SIZE * 1.1,
+    borderRadius: RADIUS.l,
+    padding: SPACING.m,
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: COLORS.card,
     overflow: 'hidden',
+    ...SHADOWS.card,
   },
   iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: SPACING.s,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   tileTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 4,
+    color: COLORS.text,
+    marginBottom: 2,
   },
   tileStatus: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    fontSize: 10,
+    color: COLORS.textTertiary,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   activeDot: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    top: 16,
+    right: 16,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   extraBtn: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    padding: 5,
+    top: 12,
+    right: 12,
+    padding: 4,
     zIndex: 10,
   },
+  extraIconBg: {
+    padding: 6,
+    borderRadius: RADIUS.full,
+  },
   footerNote: {
-    marginTop: 40,
-    width: '100%',
+    marginTop: SPACING.xl,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   footerText: {
-    color: 'rgba(255,255,255,0.3)',
+    color: COLORS.textTertiary,
     fontSize: 12,
     fontWeight: '600',
   },
   // Modal Styles
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContent: {
-    height: '50%',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    overflow: 'hidden',
+    height: '60%',
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.l,
+    ...SHADOWS.card,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: SPACING.l,
   },
   modalTitle: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '800',
+  },
+  closeBtn: {
+    padding: 8,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   emptyText: {
-    color: '#888',
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: SPACING.xl,
   },
   recordingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: SPACING.m,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    gap: 15,
+    borderBottomColor: COLORS.border,
+    gap: SPACING.m,
   },
   recordingIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
   recordingText: {
-    color: '#FFF',
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: 16,
   },
   recordingSubtext: {
-    color: '#888',
+    color: COLORS.textSecondary,
     fontSize: 12,
+    marginTop: 2,
   },
   // Team Card Styles
   teamCard: {
     width: '100%',
-    height: 90,
-    borderRadius: 24,
-    padding: 20,
+    height: 80,
+    borderRadius: RADIUS.l,
+    paddingHorizontal: SPACING.m,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 159, 10, 0.15)', // Subtle Orange tint
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: 'rgba(255, 159, 10, 0.3)',
+    borderColor: '#FED7AA',
     overflow: 'hidden',
+    ...SHADOWS.soft,
   },
   teamIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 159, 10, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.full,
+    backgroundColor: '#FFEDD5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: SPACING.m,
   },
   teamContent: {
     flex: 1,
   },
   teamTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#9A3412',
     marginBottom: 2,
   },
   teamSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    color: '#D97706',
     fontWeight: '500',
+  },
+  chevronContainer: {
+    padding: 4,
   }
 });

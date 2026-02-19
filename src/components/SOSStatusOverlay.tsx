@@ -80,6 +80,7 @@ export default function SOSStatusOverlay() {
                 <TouchableOpacity
                     style={styles.stopButton}
                     onPress={() => {
+                        console.log("🔘 SOSStatusOverlay: 'I AM SAFE' BUTTON PRESSED");
                         Vibration.vibrate(50);
                         stopSOS();
                     }}

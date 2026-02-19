@@ -18,10 +18,18 @@ export type RootTabParamList = {
   Home: undefined;
   Navigate: undefined;
   Safety: undefined;
-  Profile: NavigatorScreenParams<ProfileStackParamList>;
+  Chat: undefined;
 };
 
 export type RootStackParamList = {
+  Login: undefined;
+  SignIn: undefined; // Added SignIn route
+  Signup: undefined;
   Main: NavigatorScreenParams<RootTabParamList>;
   NearbyPlaces: { type: 'hospital' | 'police' };
+  FakeCall: { callerName?: string };
+  Contacts: undefined;
+  Guardian: undefined;
+  Notifications: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
 };

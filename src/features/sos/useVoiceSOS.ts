@@ -90,7 +90,7 @@ export const useVoiceSOS = (enabled: boolean, onActivation: () => void) => {
     return () => {
       // Ensure Voice and its methods exist before calling them.
       if (Voice && typeof Voice.destroy === 'function') {
-        Voice.destroy().catch(e => console.error("Error destroying voice listener on cleanup", e));
+        Voice.destroy().catch((e: any) => console.error("Error destroying voice listener on cleanup", e));
       } else {
         Voice?.removeAllListeners();
       }

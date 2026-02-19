@@ -9,16 +9,14 @@ import {
   Alert,
   Platform,
   Image,
-  ActionSheetIOS,
   Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
-import { supabase } from '../services/supabaseClient';
-import { Copy } from 'lucide-react-native';
+import { Copy, Camera, ChevronRight, User, Shield, Lock, Bell, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, withSpring, FadeInDown } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
@@ -27,16 +25,18 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { ProfileStackParamList, RootTabParamList } from '../navigation/types';
 import { RootStackParamList } from '../../App';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { GuardianHeader } from '../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<RootTabParamList, 'Profile'>,
-  StackNavigationProp<ProfileStackParamList & RootStackParamList>
+  StackNavigationProp<RootStackParamList, 'Profile'>,
+  StackNavigationProp<ProfileStackParamList>
 >;
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-  const { colors, darkMode, setDarkMode } = useTheme();
   const { user, profile, logout } = useAuth();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
@@ -59,9 +59,7 @@ export default function ProfileScreen() {
     transform: [{ rotate: `${shieldRotation.value}deg` }],
   }));
 
-  const onEditProfile = () => navigation.navigate('EditProfile');
   const onManageContacts = () => navigation.navigate('EmergencyContacts');
-  const onPrivacy = () => Alert.alert('Privacy & Security', 'Navigate to privacy settings.');
   const onLogout = async () => { await logout(); };
 
   const pickImage = async () => {
@@ -70,7 +68,6 @@ export default function ProfileScreen() {
       Alert.alert('Permission Required', 'Camera roll permission is needed to select photos.');
       return;
     }
-    // ... existing logic simplified for brevity but kept functional ...
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -91,89 +88,67 @@ export default function ProfileScreen() {
   };
 
   const InfoTile = ({ label, value, icon }: any) => (
-    <BlurView intensity={20} tint="dark" style={styles.infoTile}>
+    <View style={styles.infoTile}>
       <Text style={styles.tileIcon}>{icon}</Text>
       <Text style={styles.tileValue}>{value}</Text>
       <Text style={styles.tileLabel}>{label}</Text>
-    </BlurView>
+    </View>
   );
 
   if (!user) {
     return (
-      <View style={styles.container}>
-        <LinearGradient colors={['#050505', '#1a0b2e', '#000000']} style={StyleSheet.absoluteFill} />
-        <LinearGradient colors={['rgba(127, 0, 255, 0.1)', 'transparent']} style={[StyleSheet.absoluteFill, { top: -200 }]} />
-
+      <ScreenLayout>
         <View style={[styles.content, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
-          <Animated.View entering={FadeInDown.delay(100).springify()} style={{ alignItems: 'center', marginBottom: 40 }}>
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={{ alignItems: 'center', marginBottom: SPACING.xxl }}>
             <View style={styles.avatarContainer}>
-              <View style={[styles.avatarInner, { borderColor: '#7F00FF' }]}>
-                <Text style={{ fontSize: 40 }}>🔒</Text>
+              <View style={[styles.avatarInner, { borderColor: COLORS.primary }]}>
+                <Lock size={40} color={COLORS.primary} />
               </View>
             </View>
-            <Text style={[styles.userName, { textAlign: 'center' }]}>Guest Access</Text>
+            <Text style={[styles.userName, { textAlign: 'center', color: COLORS.text }]}>Guest Access</Text>
             <Text style={[styles.userHandle, { textAlign: 'center', marginTop: 10, maxWidth: 300 }]}>
               Log in to sync your safety data, manage trusted contacts, and enable ghost mode.
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(200).springify()} style={{ width: '100%', gap: 15 }}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.logoutBtn}>
-              <LinearGradient colors={['#7F00FF', '#E100FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} />
-              <Text style={[styles.logoutText, { color: '#FFF' }]}>LOG IN</Text>
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={{ width: '100%', gap: SPACING.m }}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.primaryBtn}>
+              <Text style={styles.primaryBtnText}>LOG IN</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={[styles.logoutBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}>
-              <Text style={[styles.logoutText, { color: '#FFF' }]}>CREATE ACCOUNT</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.secondaryBtn}>
+              <Text style={styles.secondaryBtnText}>CREATE ACCOUNT</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
-      </View>
+      </ScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background */}
-      <LinearGradient
-        colors={['#050505', '#1a0b2e', '#000000']}
-        locations={[0, 0.4, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* Aurora */}
-      <LinearGradient
-        colors={['rgba(0, 240, 255, 0.1)', 'transparent']}
-        style={[StyleSheet.absoluteFill, { top: -300, transform: [{ scaleX: 1.5 }] }]}
-      />
+    <ScreenLayout>
+      <GuardianHeader title="Profile" subtitle="Identity & Settings" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Profile Header with Holographic Shield */}
+        {/* Profile Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
             {/* Rotating Shield Ring */}
-            <Animated.View style={[styles.shieldRing, animatedShieldStyle]}>
-              <LinearGradient
-                colors={['transparent', '#00F0FF', 'transparent']}
-                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-
-            {/* Static Inner Glow */}
-            <View style={styles.avatarGlow} />
+            <Animated.View style={[styles.shieldRing, animatedShieldStyle]} />
 
             {/* Avatar Image */}
             <View style={styles.avatarInner}>
               {profileImage ? (
                 <Image source={{ uri: profileImage }} style={styles.avatarImage} />
               ) : (
-                <Text style={{ fontSize: 40 }}>👤</Text>
+                <User size={40} color={COLORS.textTertiary} />
+                // <Text style={{ fontSize: 40 }}>👤</Text>
               )}
             </View>
 
             <View style={styles.editBadge}>
-              <Text style={{ color: '#000', fontSize: 10, fontWeight: 'bold' }}>EDIT</Text>
+              <Camera size={12} color="#FFF" />
             </View>
           </TouchableOpacity>
 
@@ -185,7 +160,7 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.idPill} onPress={handleCopyID}>
               <Text style={styles.idLabel}>ID:</Text>
               <Text style={styles.idText}>{user?.id?.substring(0, 8)}...</Text>
-              <Copy size={12} color="rgba(255,255,255,0.6)" />
+              <Copy size={12} color={COLORS.primary} />
             </TouchableOpacity>
           )}
         </View>
@@ -198,7 +173,7 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Ghost Mode Toggle */}
-        <BlurView intensity={20} tint="dark" style={styles.ghostModeCard}>
+        <View style={styles.ghostModeCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.ghostTitle}>Ghost Mode</Text>
             <Text style={styles.ghostSubtitle}>Go unseen on the map immediately.</Text>
@@ -206,13 +181,13 @@ export default function ProfileScreen() {
           <Switch
             value={ghostMode}
             onValueChange={setGhostMode}
-            trackColor={{ false: '#333', true: 'rgba(0, 240, 255, 0.3)' }}
-            thumbColor={ghostMode ? '#00F0FF' : '#f4f3f4'}
+            trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+            thumbColor={ghostMode ? COLORS.primary : '#f4f3f4'}
           />
-        </BlurView>
+        </View>
 
         {/* Settings Groups */}
-        <BlurView intensity={30} tint="dark" style={styles.sectionCard}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>Preferences</Text>
 
           <View style={styles.settingRow}>
@@ -220,8 +195,8 @@ export default function ProfileScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: '#333', true: 'rgba(127, 0, 255, 0.4)' }}
-              thumbColor={notificationsEnabled ? '#7F00FF' : '#f4f3f4'}
+              trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+              thumbColor={notificationsEnabled ? COLORS.primary : '#f4f3f4'}
             />
           </View>
           <View style={styles.divider} />
@@ -230,33 +205,33 @@ export default function ProfileScreen() {
             <Switch
               value={shakeEnabled}
               onValueChange={setShakeEnabled}
-              trackColor={{ false: '#333', true: 'rgba(255, 45, 85, 0.4)' }}
-              thumbColor={shakeEnabled ? '#FF2D55' : '#f4f3f4'}
+              trackColor={{ false: COLORS.border, true: COLORS.dangerBg }}
+              thumbColor={shakeEnabled ? COLORS.danger : '#f4f3f4'}
             />
           </View>
-        </BlurView>
+        </View>
 
-        <BlurView intensity={30} tint="dark" style={styles.sectionCard}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>Account</Text>
 
           <TouchableOpacity style={styles.actionRow} onPress={onManageContacts}>
             <Text style={styles.actionLabel}>Emergency Contacts</Text>
-            <Text style={styles.chevron}>›</Text>
+            <ChevronRight size={20} color={COLORS.textTertiary} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('SavedAddresses')}>
             <Text style={styles.actionLabel}>Saved Locations</Text>
-            <Text style={styles.chevron}>›</Text>
+            <ChevronRight size={20} color={COLORS.textTertiary} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AudioEvidence')}>
-            <Text style={styles.actionLabel}>📂 Audio Evidence</Text>
-            <Text style={styles.chevron}>›</Text>
+            <Text style={styles.actionLabel}>Audio Evidence</Text>
+            <ChevronRight size={20} color={COLORS.textTertiary} />
           </TouchableOpacity>
-        </BlurView>
+        </View>
 
         <TouchableOpacity onPress={() => navigation.navigate('Guardian')} style={styles.guardianBtn}>
-          <Text style={styles.guardianText}>👮 SWITCH TO GUARDIAN MODE</Text>
+          <Text style={styles.guardianText}>SWITCH TO GUARDIAN MODE</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
@@ -264,125 +239,144 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
       </ScrollView>
-    </View>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050505' },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 100 },
+  content: { paddingBottom: 100 },
 
-  header: { alignItems: 'center', marginBottom: 30 },
+  header: { alignItems: 'center', marginBottom: SPACING.xl },
   avatarContainer: {
     width: 120, height: 120,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: SPACING.m,
   },
   shieldRing: {
     position: 'absolute',
     width: 120, height: 120,
-    borderRadius: 60,
+    borderRadius: RADIUS.full,
     borderWidth: 2,
-    borderColor: 'rgba(0, 240, 255, 0.3)',
+    borderColor: COLORS.primaryLight,
     borderStyle: 'dashed',
-  },
-  avatarGlow: {
-    position: 'absolute',
-    width: 100, height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(127, 0, 255, 0.2)',
-    shadowColor: '#7F00FF', shadowRadius: 20, shadowOpacity: 0.5,
+    opacity: 0.5,
   },
   avatarInner: {
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#111',
+    width: 100, height: 100, borderRadius: RADIUS.full,
+    backgroundColor: COLORS.card,
     justifyContent: 'center', alignItems: 'center',
     overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'
+    borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.soft,
   },
   avatarImage: { width: 100, height: 100 },
   editBadge: {
-    position: 'absolute', bottom: 0,
-    backgroundColor: '#00F0FF',
-    paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: 4,
+    position: 'absolute', bottom: 0, right: 10,
+    backgroundColor: COLORS.primary,
+    width: 28, height: 28,
+    borderRadius: RADIUS.full,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.background,
   },
-  userName: { color: '#FFF', fontSize: 24, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto' },
-  userHandle: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
+  userName: { color: COLORS.text, fontSize: 24, fontWeight: '800' },
+  userHandle: { color: COLORS.textSecondary, fontSize: 14, marginBottom: SPACING.s },
 
   idPill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 12,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: COLORS.primaryPale,
+    paddingHorizontal: SPACING.m, paddingVertical: SPACING.s,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.s,
+    borderWidth: 1, borderColor: COLORS.primaryLight + '40',
   },
-  idLabel: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 12, marginRight: 4, fontWeight: '600' },
-  idText: { color: '#00F0FF', fontSize: 12, fontWeight: '700', marginRight: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  idLabel: { color: COLORS.textSecondary, fontSize: 12, marginRight: 4, fontWeight: '600' },
+  idText: { color: COLORS.primary, fontSize: 12, fontWeight: '700', marginRight: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
 
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.l },
   infoTile: {
     width: (width - 40) / 3 - 8,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: SPACING.m,
+    borderRadius: RADIUS.m,
+    backgroundColor: COLORS.card,
     alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.soft,
   },
   tileIcon: { fontSize: 20, marginBottom: 5 },
-  tileValue: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  tileLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, textTransform: 'uppercase' },
+  tileValue: { color: COLORS.text, fontSize: 18, fontWeight: 'bold' },
+  tileLabel: { color: COLORS.textSecondary, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold' },
 
   ghostModeCard: {
     flexDirection: 'row', alignItems: 'center',
-    padding: 20, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderWidth: 1, borderColor: 'rgba(0, 240, 255, 0.2)',
-    marginBottom: 20,
+    padding: SPACING.m, borderRadius: RADIUS.l,
+    backgroundColor: COLORS.card,
+    borderWidth: 1, borderColor: COLORS.border,
+    marginBottom: SPACING.l,
+    ...SHADOWS.soft,
   },
-  ghostTitle: { color: '#00F0FF', fontSize: 18, fontWeight: 'bold' },
-  ghostSubtitle: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  ghostTitle: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
+  ghostSubtitle: { color: COLORS.textSecondary, fontSize: 12 },
 
   sectionCard: {
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    marginBottom: 20,
+    borderRadius: RADIUS.l,
+    backgroundColor: COLORS.card,
+    marginBottom: SPACING.l,
     overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.soft,
   },
   sectionHeader: {
-    padding: 15,
-    color: 'rgba(255,255,255,0.4)',
+    padding: SPACING.m,
+    color: COLORS.textTertiary,
     fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: COLORS.background,
   },
   settingRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 15,
+    padding: SPACING.m,
   },
-  settingLabel: { color: '#FFF', fontSize: 16 },
+  settingLabel: { color: COLORS.text, fontSize: 16 },
 
   actionRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 15,
+    padding: SPACING.m,
   },
-  actionLabel: { color: '#FFF', fontSize: 16 },
-  chevron: { color: 'rgba(255,255,255,0.3)', fontSize: 20 },
+  actionLabel: { color: COLORS.text, fontSize: 16 },
 
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginLeft: 15 },
+  divider: { height: 1, backgroundColor: COLORS.border, marginLeft: SPACING.m },
 
   logoutBtn: {
-    alignItems: 'center', padding: 15,
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 45, 85, 0.3)',
+    alignItems: 'center', padding: SPACING.m,
+    borderRadius: RADIUS.m, borderWidth: 1, borderColor: COLORS.danger,
+    marginTop: SPACING.m,
   },
-  logoutText: { color: '#FF2D55', fontWeight: 'bold', letterSpacing: 1 },
+  logoutText: { color: COLORS.danger, fontWeight: 'bold', letterSpacing: 1 },
 
   guardianBtn: {
-    alignItems: 'center', padding: 15,
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.5)',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    marginBottom: 10,
+    alignItems: 'center', padding: SPACING.m,
+    borderRadius: RADIUS.m,
+    backgroundColor: COLORS.primary,
+    marginBottom: SPACING.s,
+    ...SHADOWS.glow,
   },
-  guardianText: { color: '#3b82f6', fontWeight: 'bold', letterSpacing: 1 },
+  guardianText: { color: '#FFF', fontWeight: 'bold', letterSpacing: 1 },
+
+  // Auth/Guest styles
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.m,
+    borderRadius: RADIUS.m,
+    alignItems: 'center',
+    ...SHADOWS.glow,
+  },
+  primaryBtnText: { color: '#FFF', fontWeight: 'bold', letterSpacing: 1 },
+  secondaryBtn: {
+    backgroundColor: 'transparent',
+    paddingVertical: SPACING.m,
+    borderRadius: RADIUS.m,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  secondaryBtnText: { color: COLORS.text, fontWeight: 'bold', letterSpacing: 1 },
 });

@@ -31,36 +31,8 @@ export interface SOSContextType {
   policeStatus: string | null;
 }
 
-// Helper: Upload audio evidence to Supabase Storage + metadata table
-async function uploadAudioEvidence(userId: string, alertId: string | null, localUri: string, duration: string) {
-  try {
-    const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' });
-    const arrayBuffer = decode(base64);
-    const fileName = `${userId}/${alertId || 'unlinked'}/${Date.now()}.m4a`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('audio-evidence')
-      .upload(fileName, arrayBuffer, { contentType: 'audio/mp4', upsert: false });
-
-    if (uploadError) {
-      console.log('Storage upload error:', uploadError.message);
-      return;
-    }
-
-    // Save metadata to audio_evidence table
-    await supabase.from('audio_evidence').insert({
-      user_id: userId,
-      alert_id: alertId,
-      storage_path: fileName,
-      duration,
-      recorded_at: new Date().toISOString(),
-    });
-
-    console.log('🎙️ Audio evidence uploaded:', fileName);
-  } catch (e) {
-    console.log('uploadAudioEvidence failed:', e);
-  }
-}
+// Helper removed, imported from services/audioService
+import { uploadAudioEvidence } from '../services/audioService';
 
 const SOSContext = createContext<SOSContextType | undefined>(undefined);
 
@@ -72,14 +44,20 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
 
   // Real-Time Tracking State
   const [isSOSActive, setIsSOSActive] = useState(false);
-  const [alertId, setAlertId] = useState<string | null>(null);
+  const [alertId, setAlertIdState] = useState<string | null>(null);
+  const alertIdRef = useRef<string | null>(null);
+
+  const setAlertId = (id: string | null) => {
+    alertIdRef.current = id;
+    setAlertIdState(id);
+  };
   const [policeStatus, setPoliceStatus] = useState<string | null>(null);
 
   // Realtime subscription for police updates
   useEffect(() => {
     if (!alertId) return;
 
-    console.log("👮 Subscribing to police updates for alert:", alertId);
+    if (__DEV__) console.log("👮 Subscribing to police updates for alert:", alertId);
 
     // 1. Initial Fetch
     supabase
@@ -104,7 +82,7 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
           filter: `alert_id=eq.${alertId}`
         },
         (payload) => {
-          console.log("👮 New Police Action:", payload.new.action);
+          if (__DEV__) console.log("👮 New Police Action:", payload.new.action);
           setPoliceStatus(payload.new.action);
         }
       )
@@ -198,6 +176,14 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
       // --- START AUDIO RECORDING ---
       console.log("🎙️ DEBUG: Starting Audio Recorder...");
       const recording = await startRecording();
+
+      if (!recording) {
+        console.error("❌ CRITICAL: Recording failed to start (returned null). Permission issue?");
+        Alert.alert("Debug", "Recording FAILED to start.");
+      } else {
+        console.log("✅ Recording started successfully object:", recording ? "OK" : "NULL");
+        // Alert.alert("Debug", "Recording Started!"); // Optional, maybe too noisy
+      }
       recordingRef.current = recording;
 
       if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
@@ -207,20 +193,25 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
         const uri = await stopRecording(recordingRef.current);
         recordingRef.current = null;
         if (uri) {
+          // Upload to Supabase Storage first
+          let isUploaded = 0;
+          try {
+            await uploadAudioEvidence(user!.id, null, uri, '60s (Auto)');
+            isUploaded = 1;
+            console.log("🎙️ Audio uploaded successfully (Auto-stop)");
+          } catch (e) {
+            console.log('Audio upload failed (auto-stop), saved locally:', e);
+          }
+
+          // Save to SQLite
           await sqlite.saveAudioLog({
             id: Date.now().toString(),
             uri,
             timestamp: Date.now(),
-            duration: '60s (Auto)'
+            duration: '60s (Auto)',
+            uploaded: isUploaded
           });
           console.log("🎙️ Evidence Saved Locally (Auto-Stop)");
-
-          // Upload to Supabase Storage
-          try {
-            await uploadAudioEvidence(user!.id, null, uri, '60s (Auto)');
-          } catch (e) {
-            console.log('Audio upload failed (auto-stop), saved locally:', e);
-          }
         }
       }, 60000);
 
@@ -247,26 +238,13 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
         console.warn('Reverse geocode failed:', e);
       }
 
-      const { error: upsertError } = await supabase
-        .from('active_alerts')
-        .upsert({
-          user_id: user.id,
-          status: 'ACTIVE',
-          user_email: user.email,
-          user_name: user.fullName || 'Unknown',
-          started_at: new Date().toISOString(),
-          latitude: initialLocation.coords.latitude,
-          longitude: initialLocation.coords.longitude,
-          heading: initialLocation.coords.heading,
-          speed: initialSpeed,
-          battery: initialBattery ?? -1,
-          address_snapshot: addressSnapshot,
-          last_updated: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
+      // Delete any existing alert record for this user to ensure we generate a NEW ID
+      // This prevents old police_responses from being linked to the new session
+      await supabase.from('active_alerts').delete().eq('user_id', user.id);
 
-      if (upsertError) {
-        // If upsert with onConflict fails (no unique constraint on user_id by default), do insert
-        await supabase.from('active_alerts').insert({
+      const { error: insertError } = await supabase
+        .from('active_alerts')
+        .insert({
           user_id: user.id,
           status: 'ACTIVE',
           user_email: user.email,
@@ -280,6 +258,11 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
           address_snapshot: addressSnapshot,
           last_updated: new Date().toISOString(),
         });
+
+      if (insertError) {
+        console.error("SOS Insert Error:", insertError);
+        // Fallback? If insert fails, we might still want to try upsert or just throw
+        throw insertError;
       }
 
       // Get the alert ID for future updates
@@ -293,6 +276,10 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       const dbAlertId = alertData?.id;
+      if (dbAlertId) {
+        console.log("✅ Alert ID Assigned:", dbAlertId);
+        setAlertId(dbAlertId);
+      }
 
       // --- 4. Start Real-Time Watcher ---
       locationSubscription.current = await Location.watchPositionAsync(
@@ -377,7 +364,11 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const stopSOS = useCallback(async () => {
-    if (!user) return;
+    console.log("🛑 STOP SOS FUNCTION CALLED");
+    if (!user) {
+      console.warn("🛑 Stop SOS aborted: No user");
+      return;
+    }
 
     try {
       // 1. Stop Watcher
@@ -394,14 +385,45 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
 
       let audioUri: string | null = null;
       if (recordingRef.current) {
-        audioUri = await stopRecording(recordingRef.current);
+        console.log("🛑 Stopping Audio Recording...");
+        try {
+          audioUri = await stopRecording(recordingRef.current);
+          console.log("✅ Audio URI obtained:", audioUri);
+          if (audioUri) {
+            Alert.alert("Debug", "Audio Saved: " + audioUri.split('/').pop());
+          } else {
+            Alert.alert("Debug", "Audio Save FAILED (URI null)");
+          }
+        } catch (err) {
+          console.error("❌ Error stopping recording:", err);
+        }
         recordingRef.current = null;
+
         if (audioUri) {
+          // 5. Upload audio evidence to Supabase Storage
+          let isUploaded = 0;
+          try {
+            // Use the persistent alert ID from REF to avoid stale closures
+            const targetAlertId = alertIdRef.current;
+            console.log(`🎙️ [DEBUG] Attempting Upload. UserID: ${user.id}, AlertID: ${targetAlertId}`);
+
+            if (!targetAlertId) {
+              console.warn("⚠️ [DEBUG] Alert ID is MISSING during upload. Evidence will be unlinked (or linked to user only).");
+            }
+
+            await uploadAudioEvidence(user.id, targetAlertId, audioUri, 'Manual Stop');
+            isUploaded = 1;
+            console.log("🎙️ Audio uploaded successfully (Manual Stop)");
+          } catch (e) {
+            console.log('Audio upload failed, saved locally:', e);
+          }
+
           await sqlite.saveAudioLog({
             id: Date.now().toString(),
             uri: audioUri,
             timestamp: Date.now(),
-            duration: 'Manual Stop'
+            duration: 'Manual Stop',
+            uploaded: isUploaded
           });
           console.log("🎙️ Evidence Saved Locally");
         }
@@ -454,15 +476,6 @@ export const SOSProvider = ({ children }: { children: ReactNode }) => {
         console.log('📋 Alert archived to history:', historyId);
       } catch (e) {
         console.log('Could not archive alert to history:', e);
-      }
-
-      // 5. Upload audio evidence to Supabase Storage
-      if (audioUri) {
-        try {
-          await uploadAudioEvidence(user.id, historyId, audioUri, 'Manual Stop');
-        } catch (e) {
-          console.log('Audio upload failed, saved locally:', e);
-        }
       }
 
       // 6. Reset State

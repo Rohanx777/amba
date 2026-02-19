@@ -10,12 +10,14 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../context/ThemeContext'; // Path update karein
+import { useTheme } from '../context/ThemeContext';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { searchNearbyPlaces, Place } from '../services/placesService';
 import * as Location from 'expo-location';
-
+import { ScreenLayout } from '../components/ScreenLayout';
+import { GuardianHeader } from '../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
+import { MapPin, Navigation, ArrowRight } from 'lucide-react-native';
 
 // Define route params
 type NearbyPlacesRouteParams = {
@@ -27,13 +29,11 @@ type NearbyPlacesRouteParams = {
 type NearbyPlacesRouteProp = RouteProp<NearbyPlacesRouteParams, 'NearbyPlaces'>;
 
 export default function NearbyPlacesScreen({ navigation }: any) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]); // Memoized styles
   const route = useRoute<NearbyPlacesRouteProp>();
-  
+
   const { type } = route.params;
-  const title = type === 'hospital' ? 'Nearby Hospitals' : 'Nearby Police Stations';
-  const icon = type === 'hospital' ? '🏥' : '👮';
+  const title = type === 'hospital' ? 'Hospitals' : 'Police Stations';
+  const subtitle = `Nearest ${type === 'hospital' ? 'Medical Centers' : 'Stations'} within 5km`;
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,6 @@ export default function NearbyPlacesScreen({ navigation }: any) {
     setLoading(true);
     setError(null);
     try {
-      // 1. Get location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setError('Location permission denied');
@@ -55,209 +54,190 @@ export default function NearbyPlacesScreen({ navigation }: any) {
         return;
       }
 
-      // 2. Get current location
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
 
-      // 3. Call Google Places API
       const results = await searchNearbyPlaces(latitude, longitude, type);
       setPlaces(results);
     } catch (err: any) {
       console.error(err);
       if (err.message === 'API key is missing.') {
-        setError('The application is not configured correctly. API key is missing.');
+        setError('API Key Missing');
       } else {
-        setError('Could not fetch nearby places. Please check your connection and try again.');
+        setError('Could not fetch places.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Function to open location in Maps
   const openInMaps = (lat: number, lng: number, label: string) => {
     const scheme = Platform.OS === 'ios' ? 'maps://0,0?q=' : 'geo:0,0?q=';
     const location = `${lat},${lng}`;
     const url = `${scheme}${location}(${label})`;
-    // ✅ NAYA (SAFE) CODE:
     Linking.openURL(url).catch(err => Alert.alert('Error', 'Could not open maps application.'));
   };
 
   return (
-    <LinearGradient
-      colors={[colors.background, colors.backgroundLight]}
-      style={styles.container}
-    >
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+    <ScreenLayout>
+      <GuardianHeader
+        title={title}
+        subtitle={subtitle}
+        isBack
+        onBackPress={() => navigation.goBack()}
+      />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.headerIcon}>{icon}</Text>
-          <Text style={styles.headerTitle}>{title}</Text>
-          <Text style={styles.headerSubtitle}
->
-            Showing nearest {type} locations within 5km
-          </Text>
-        </View>
-
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {loading && (
-          <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Scanning vicinity...</Text>
+          </View>
         )}
 
         {error && (
-          <View style={[styles.card, styles.errorContainer]}>
+          <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.tryAgainButton} onPress={fetchNearbyPlaces}>
-              <Text style={styles.tryAgainButtonText}>Try Again</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchNearbyPlaces}>
+              <Text style={styles.retryText}>Retry Scan</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {!loading && !error && (
-          <View style={styles.card}>
-            <View style={styles.resourcesList}>
-              {places.length > 0 ? (
-                places.map((place) => (
-                  <TouchableOpacity
-                    key={place.id}
-                    style={styles.resourceItem}
-                    onPress={() => openInMaps(place.location.latitude, place.location.longitude, place.displayName.text)}
-                  >
-                    <Text style={styles.resourceIcon}>{icon}</Text>
-                    <View style={styles.resourceContent}>
-                      <Text style={styles.resourceTitle}>{place.displayName.text}</Text>
-                      <Text style={styles.resourceSubtitle}>{place.formattedAddress}</Text>
-                    </View>
-                    <Text style={styles.resourceArrow}>›</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.tipDescription}>
-                  No {type} locations found nearby.
+          <View style={styles.listContainer}>
+            {places.length > 0 ? (
+              places.map((place) => (
+                <TouchableOpacity
+                  key={place.id}
+                  style={styles.card}
+                  activeOpacity={0.9}
+                  onPress={() => openInMaps(place.location.latitude, place.location.longitude, place.displayName.text)}
+                >
+                  <View style={styles.iconBox}>
+                    <MapPin size={24} color={type === 'police' ? COLORS.primary : COLORS.danger} />
+                  </View>
+
+                  <View style={styles.cardContent}>
+                    <Text style={styles.placeName}>{place.displayName.text}</Text>
+                    <Text style={styles.placeAddress} numberOfLines={2}>
+                      {place.formattedAddress}
+                    </Text>
+                    {place.userRatingCount !== undefined && (
+                      <Text style={styles.ratingText}>
+                        ⭐ {place.rating || 'N/A'} ({place.userRatingCount})
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.actionIcon}>
+                    <ArrowRight size={20} color={COLORS.textTertiary} />
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No locations found nearby.
                 </Text>
-              )}
-            </View>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
-    </LinearGradient>
+    </ScreenLayout>
   );
 }
 
-// In styles ko SafetyScreen se copy kiya gaya hai "similar UI" ke liye
-const makeStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    backButton: {
-      position: 'absolute',
-      top: Platform.OS === 'ios' ? 60 : 40,
-      left: 20,
-      zIndex: 10,
-      backgroundColor: 'rgba(0,0,0,0.3)',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 15,
-    },
-    backButtonText: {
-      color: '#FFF',
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    content: {
-      padding: 20,
-      paddingTop: Platform.OS === 'ios' ? 110 : 100,
-      paddingBottom: 100,
-    },
-    header: {
-      marginBottom: 25,
-      alignItems: 'center',
-    },
-    headerIcon: {
-      fontSize: 48,
-      marginBottom: 15,
-    },
-    headerTitle: {
-      fontSize: 28,
-      fontWeight: '900',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    headerSubtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      lineHeight: 22,
-    },
-    card: {
-      backgroundColor: colors.backgroundCard,
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
-    },
-    loader: {
-      marginTop: 50,
-    },
-    errorContainer: {
-      alignItems: 'center',
-      padding: 30,
-    },
-    errorText: {
-      color: colors.danger,
-      fontSize: 16,
-      textAlign: 'center',
-      marginBottom: 20,
-    },
-    tryAgainButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: 12,
-      paddingHorizontal: 30,
-      borderRadius: 25,
-    },
-    tryAgainButtonText: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    resourcesList: {
-      gap: 12,
-    },
-    resourceItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.background + '30',
-      borderRadius: 12,
-      padding: 15,
-    },
-    resourceIcon: {
-      fontSize: 20,
-      marginRight: 15,
-    },
-    resourceContent: {
-      flex: 1,
-    },
-    resourceTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 3,
-    },
-    resourceSubtitle: {
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    resourceArrow: {
-      fontSize: 18,
-      color: colors.textMuted,
-    },
-    tipDescription: { // Reusing style
-      fontSize: 14,
-      color: colors.textSecondary,
-      lineHeight: 20,
-      textAlign: 'center',
-    },
-  });
+const styles = StyleSheet.create({
+  content: {
+    paddingBottom: SPACING.xl,
+  },
+  centerContainer: {
+    paddingVertical: SPACING.xxl,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SPACING.m,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  listContainer: {
+    gap: SPACING.m,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.l,
+    padding: SPACING.m,
+    ...SHADOWS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.m,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.m,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  placeName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  placeAddress: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  ratingText: {
+    fontSize: 10,
+    color: COLORS.textTertiary,
+    fontWeight: '600',
+  },
+  actionIcon: {
+    justifyContent: 'center',
+    paddingLeft: SPACING.s,
+  },
+  errorContainer: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+    backgroundColor: COLORS.dangerBg,
+    borderRadius: RADIUS.l,
+    marginTop: SPACING.l,
+  },
+  errorText: {
+    color: COLORS.danger,
+    textAlign: 'center',
+    fontWeight: '700',
+    marginBottom: SPACING.m,
+  },
+  retryButton: {
+    backgroundColor: COLORS.card,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.s,
+    borderRadius: RADIUS.full,
+    ...SHADOWS.soft,
+  },
+  retryText: {
+    color: COLORS.danger,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: COLORS.textTertiary,
+    fontSize: 14,
+  }
+});

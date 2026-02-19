@@ -61,3 +61,30 @@ export interface AudioEvidence {
     duration: string | null;
     recorded_at: string;
 }
+
+// ─── Anonymous Reports (from anonymous_reports table) ─────────────
+
+export interface AnonymousReport {
+    id: string;
+    content: string;
+    location: string | null;
+    incident_type: string;
+    media_urls: string[] | null;
+    status: 'PENDING' | 'REVIEWED' | 'ACTIONED' | 'DISMISSED';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    source: string;
+    created_at: string;
+    updated_at: string;
+}
+
+// ─── Volunteer (from volunteers table) ────────────────────────────
+
+export interface Volunteer {
+    id: string;
+    full_name: string;
+    phone_number: string | null;
+    latitude: number;
+    longitude: number;
+    status: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+    last_active: string;
+}

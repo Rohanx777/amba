@@ -20,7 +20,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { Target, Navigation, MapPin } from 'lucide-react-native';
+import { Target, Navigation, MapPin, RefreshCcw, Menu } from 'lucide-react-native';
+import { MenuContext } from '../context/MenuContext';
 import Animated, { FadeIn, FadeInDown, SlideInUp } from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
@@ -30,29 +31,37 @@ import { SafetySegment } from '../utils/safetyAnalysis';
 import { useAuth } from '../context/AuthContext';
 import { fetchSavedAddresses, SavedAddress, addSavedAddress } from '../services/addressService';
 import { aiSafetyAnalyzer, calculateAIOverallSafetyScore } from '../utils/aiSafetyAnalyzer';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
 
 // IMPORTANT: Add your Google Maps API Key here
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const { width, height } = Dimensions.get('window');
 
-// --- Custom Dark Map Style (Stealth Luxury) ---
+// --- Custom Light Map Style (Guardian Silver) ---
 const mapCustomStyle = [
-  { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
+  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
   { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#212121" }] },
-  { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#757575" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
   { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#2c2c2c" }] },
-  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#3c3c3c" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
 ];
 
 export default function MapScreen() {
   const { colors } = useTheme();
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation();
+  const { toggleMenu } = React.useContext(MenuContext);
 
   // --- STATE ---
   const [region, setRegion] = useState({
@@ -904,7 +913,16 @@ export default function MapScreen() {
 
     // Follow user with pitched camera during navigation
     if (mapRef.current) {
-      // NOTE: We rely on MapView props for following, but we can enforce pitch here if needed.
+      mapRef.current.animateCamera({
+        center: {
+          latitude: userCoords.latitude,
+          longitude: userCoords.longitude,
+        },
+        pitch: 50,
+        heading: userCoords.heading || 0,
+        zoom: 18,
+        altitude: 200
+      }, { duration: 1000 }); // Smooth 1s transition
     }
 
     // Step Advancement
@@ -945,21 +963,9 @@ export default function MapScreen() {
         provider={PROVIDER_GOOGLE}
         region={region}
         customMapStyle={mapCustomStyle}
-        // Updated Nav Behavior
-        showsUserLocation={!isGhostMode || isNavigating}
-        followsUserLocation={isNavigating}
-        showsCompass={!isNavigating}
-        pitchEnabled={true}
-        camera={isNavigating && userLocation ? {
-          center: {
-            latitude: userLocation.coords.latitude,
-            longitude: userLocation.coords.longitude,
-          },
-          pitch: 45,
-          heading: userLocation.coords.heading || 0,
-          altitude: 200, // Approximate for zoom level
-          zoom: 18
-        } : undefined}
+        showsUserLocation={!isGhostMode} // Let MapView handle the blue dot natively for smoothness
+        followsUserLocation={false} // We handle camera manually for better control
+        showsCompass={false}
         showsMyLocationButton={false}
         userInterfaceStyle="dark"
         onRegionChangeComplete={handleRegionChange}
@@ -1057,34 +1063,39 @@ export default function MapScreen() {
 
       {/* 3. Top Control Bar (Search & Ghost Toggle) */}
       <View style={[styles.topBar, { zIndex: 100 }]}>
-        <BlurView intensity={20} tint="dark" style={styles.searchBar}>
+        {/* Menu Button */}
+        <TouchableOpacity onPress={toggleMenu} style={styles.menuBtn}>
+          <Menu size={24} color={COLORS.text} />
+        </TouchableOpacity>
+
+        <View style={styles.searchBar}>
           <View style={styles.searchPlaceholder}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.inlineSearchInput}
               placeholder="Where to safely?"
-              placeholderTextColor="rgba(255,255,255,0.6)"
+              placeholderTextColor={COLORS.textTertiary}
               value={endLocation}
               onChangeText={fetchSuggestions}
             />
             {endLocation.length > 0 && (
               <TouchableOpacity onPress={() => { setEndLocation(''); setSuggestions([]); }}>
-                <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.6)" />
+                <Ionicons name="close-circle" size={20} color={COLORS.textTertiary} />
               </TouchableOpacity>
             )}
           </View>
-        </BlurView>
+        </View>
 
         {/* Ghost Mode Toggle */}
-        <BlurView intensity={20} tint="dark" style={styles.ghostToggle}>
+        <View style={styles.ghostToggle}>
           <Text style={styles.ghostIcon}>👻</Text>
           <Switch
             value={isGhostMode}
             onValueChange={setIsGhostMode}
-            trackColor={{ false: '#333', true: 'rgba(127, 0, 255, 0.5)' }}
-            thumbColor={isGhostMode ? '#7F00FF' : '#f4f3f4'}
+            trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+            thumbColor={isGhostMode ? COLORS.primary : '#f4f3f4'}
           />
-        </BlurView>
+        </View>
       </View>
 
       {/* 4. Safety Filter Toggles (Responsive Position) */}
@@ -1182,20 +1193,20 @@ export default function MapScreen() {
       {
         !isNavigating && !showRouteInput && (
           <Animated.View entering={SlideInUp.delay(500)} style={[styles.hudContainer, { zIndex: 20 }]}>
-            <BlurView intensity={30} tint="dark" style={styles.hudGlass}>
+            <View style={styles.hudGlass}>
               <View style={styles.hudRow}>
                 <View style={styles.hudInfo}>
                   <Text style={styles.hudLabel}>CURRENT LOCATION</Text>
                   <Text style={styles.hudValue} numberOfLines={1}>{currentAddressLabel}</Text>
                 </View>
                 <View style={[styles.hudStatus, isGhostMode ? styles.statusGhost : styles.statusActive]}>
-                  <View style={[styles.statusDot, { backgroundColor: isGhostMode ? '#A855F7' : '#00F0FF' }]} />
-                  <Text style={[styles.statusText, { color: isGhostMode ? '#A855F7' : '#00F0FF' }]}>
+                  <View style={[styles.statusDot, { backgroundColor: isGhostMode ? '#A855F7' : COLORS.success }]} />
+                  <Text style={[styles.statusText, { color: isGhostMode ? '#A855F7' : COLORS.success }]}>
                     {isGhostMode ? 'GHOST MODE' : 'MONITORING'}
                   </Text>
                 </View>
               </View>
-            </BlurView>
+            </View>
           </Animated.View>
         )
       }
@@ -1238,14 +1249,22 @@ export default function MapScreen() {
         )
       }
 
-      {/* 8. Recenter Button */}
-      {
-        !isNavigating && !showRouteInput && (
-          <TouchableOpacity onPress={handleRecenter} style={styles.recenterBtn}>
+      {/* 8. Floating Controls (Refresh & Recenter) */}
+      <View style={styles.floatingControls}>
+        {/* Refresh / Reset Route Button */}
+        {(routeCoordinates.length > 0 || startLocation.length > 0 || endLocation.length > 0) && (
+          <TouchableOpacity onPress={stopNavigation} style={[styles.controlBtn, { backgroundColor: COLORS.dangerBg, borderColor: COLORS.danger }]} activeOpacity={0.8}>
+            <RefreshCcw size={24} color={COLORS.danger} />
+          </TouchableOpacity>
+        )}
+
+        {/* Recenter Button */}
+        {!isNavigating && !showRouteInput && (
+          <TouchableOpacity onPress={handleRecenter} style={[styles.controlBtn, { marginTop: 12 }]}>
             <Target size={24} color="#000" />
           </TouchableOpacity>
-        )
-      }
+        )}
+      </View>
 
       {/* 6. Route Planning Modal */}
       <Modal
@@ -1255,7 +1274,7 @@ export default function MapScreen() {
         onRequestClose={() => setShowRouteInput(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView intensity={50} tint="dark" style={styles.modalGlassCard}>
+          <View style={styles.modalGlassCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>SECURE ROUTE</Text>
               <TouchableOpacity onPress={() => setShowRouteInput(false)}>
@@ -1269,7 +1288,7 @@ export default function MapScreen() {
                 <TextInput
                   style={styles.glassInput}
                   placeholder="Current Location"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  placeholderTextColor={COLORS.textTertiary}
                   value={startLocation}
                   onChangeText={setStartLocation}
                 />
@@ -1282,7 +1301,7 @@ export default function MapScreen() {
                 <TextInput
                   style={styles.glassInput}
                   placeholder="Destination"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  placeholderTextColor={COLORS.textTertiary}
                   value={endLocation}
                   onChangeText={fetchSuggestions}
                 />
@@ -1313,9 +1332,9 @@ export default function MapScreen() {
             </View>
 
             <TouchableOpacity onPress={generateRoute} style={styles.actionBtn}>
-              {isLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.actionBtnText}>ANALYZE SAFETY</Text>}
+              {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.actionBtnText}>ANALYZE SAFETY</Text>}
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </View>
       </Modal>
 
@@ -1323,7 +1342,7 @@ export default function MapScreen() {
       {
         showSaferAlternative && !showRouteInput && !isNavigating && (
           <Animated.View entering={FadeInDown} style={[styles.safetyCardWrapper, { zIndex: 25 }]}>
-            <BlurView intensity={40} tint="dark" style={styles.safetyCard}>
+            <View style={styles.safetyCard}>
               <View style={styles.safetyHeader}>
                 <Text style={styles.safetyTitle}>Safety Assessment</Text>
                 <View style={styles.scoreBadge}>
@@ -1363,7 +1382,7 @@ export default function MapScreen() {
               <TouchableOpacity onPress={startNavigation} style={styles.startNavBtn}>
                 <Text style={styles.startNavText}>START NAVIGATION</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </Animated.View>
         )
       }
@@ -1375,7 +1394,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: COLORS.background,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -1391,15 +1410,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
+    zIndex: 10,
+  },
+  menuBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.soft,
   },
   searchBar: {
     flex: 1,
     height: 50,
-    borderRadius: 25,
+    borderRadius: RADIUS.full,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   searchPlaceholder: {
     flex: 1,
@@ -1409,49 +1439,53 @@ const styles = StyleSheet.create({
   },
   inlineSearchInput: {
     flex: 1,
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 16,
     height: '100%',
   },
   searchIcon: {
     marginRight: 10,
     fontSize: 16,
+    color: COLORS.textSecondary,
   },
   searchText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: COLORS.textSecondary,
     fontSize: 14,
   },
   ghostToggle: {
     width: 80,
     height: 50,
-    borderRadius: 25,
+    borderRadius: RADIUS.full,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.border,
     gap: 5,
+    ...SHADOWS.soft,
   },
   ghostIcon: {
     fontSize: 18,
+    color: COLORS.primary,
   },
 
   // HUD
   hudContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 110, // Adjusted for CustomTabBar
     left: 20,
     right: 20,
-    borderRadius: 24,
+    borderRadius: RADIUS.l,
     overflow: 'hidden',
+    ...SHADOWS.card,
   },
   hudGlass: {
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
   },
   hudRow: {
     flexDirection: 'row',
@@ -1463,14 +1497,14 @@ const styles = StyleSheet.create({
     marginRight: 15, // Add spacing between text and status badge
   },
   hudLabel: {
-    color: 'rgba(255,255,255,0.4)',
+    color: COLORS.textTertiary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 4,
   },
   hudValue: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
     maxWidth: 200,
@@ -1484,12 +1518,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusActive: {
-    backgroundColor: 'rgba(0, 240, 255, 0.1)',
-    borderColor: 'rgba(0, 240, 255, 0.3)',
+    backgroundColor: 'rgba(56, 189, 248, 0.15)', // Light blue bg
+    borderColor: COLORS.primaryLight,
   },
   statusGhost: {
-    backgroundColor: 'rgba(127, 0, 255, 0.1)',
-    borderColor: 'rgba(127, 0, 255, 0.3)',
+    backgroundColor: 'rgba(124, 58, 237, 0.1)', // Light purple bg
+    borderColor: COLORS.primaryLight,
   },
   statusDot: {
     width: 6,
@@ -1500,6 +1534,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 10,
     fontWeight: '700',
+    color: COLORS.textSecondary,
   },
 
   // Modal styling
@@ -1512,11 +1547,12 @@ const styles = StyleSheet.create({
   modalGlassCard: {
     width: width - 40,
     padding: 24,
-    borderRadius: 30,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    backgroundColor: 'rgba(20,20,20,0.6)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1525,19 +1561,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: 'bold',
   },
   // Intel Styles
-  intelContainer: {
-    marginTop: 15,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
+
   intelHeader: {
-    color: 'rgba(255,255,255,0.4)',
+    color: COLORS.textTertiary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
@@ -1550,13 +1581,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   intelText: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '500',
   }
   ,
   closeText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: COLORS.textSecondary,
     fontSize: 20,
   },
   inputStack: {
@@ -1564,17 +1595,17 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   glassInputWrapper: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 15,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.m,
     padding: 15,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: COLORS.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   inputLabel: {
-    color: 'rgba(255,255,255,0.3)',
+    color: COLORS.textTertiary,
     fontSize: 10,
     fontWeight: '700',
     marginBottom: 5,
@@ -1583,20 +1614,21 @@ const styles = StyleSheet.create({
     left: 15,
   },
   glassInput: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
     marginTop: 10,
   },
   actionBtn: {
-    backgroundColor: '#00F0FF',
-    borderRadius: 15,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.m,
     paddingVertical: 16,
     alignItems: 'center',
+    ...SHADOWS.glow,
   },
   actionBtnText: {
-    color: '#000',
+    color: '#FFF',
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1,
@@ -1608,16 +1640,18 @@ const styles = StyleSheet.create({
     top: 60,
     left: 20,
     right: 20,
-    borderRadius: 20,
+    borderRadius: RADIUS.l,
     overflow: 'hidden',
   },
   navGlassPanel: {
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: COLORS.card,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   navInstruction: {
-    color: '#FFF',
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
@@ -1634,16 +1668,12 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 60 : 50,
     left: 20,
     right: 20,
-    backgroundColor: '#007AFF', // Professional Navigation Blue
-    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.m,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...SHADOWS.card,
     zIndex: 100,
   },
   turnIconBox: {
@@ -1670,16 +1700,12 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     marginHorizontal: 0, // Already handled by left/right: 20
-    backgroundColor: '#FFFFFF', // White Card
-    borderRadius: 20, // Full rounded corners for floating look
+    backgroundColor: COLORS.card, // White Card
+    borderRadius: RADIUS.l, // Full rounded corners for floating look
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 8,
+    ...SHADOWS.card,
     zIndex: 100,
   },
   navStatsRow: {
@@ -1688,13 +1714,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navTime: {
-    color: '#0F9D58', // Green Text
+    color: COLORS.success, // Green Text
     fontSize: 28,
     fontWeight: '800',
     marginBottom: 4,
   },
   navMetaText: {
-    color: '#333',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1702,36 +1728,42 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#EF4444', // Red Exir
+    backgroundColor: COLORS.danger, // Red Exit
     justifyContent: 'center',
     alignItems: 'center',
+    ...SHADOWS.soft,
   },
 
   // Safety Card
   safetyCardWrapper: {
     position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    borderRadius: 24,
-    overflow: 'hidden',
+    bottom: 90, // Raised to clear Tab Bar (assuming ~80px height) + Spacing
+    left: 16,
+    right: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   safetyCard: {
-    padding: 20,
-    backgroundColor: 'rgba(20,20,20,0.8)',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.l,
+    padding: 16, // Reduced padding
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.border,
+    overflow: 'hidden',
   },
   safetyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8, // Reduced margin
   },
   safetyTitle: {
-    color: '#FFF',
-    fontSize: 16,
+    fontSize: 18, // Reduced size
     fontWeight: '700',
+    color: COLORS.text,
   },
   scoreBadge: {
     backgroundColor: 'rgba(0,255,0,0.1)',
@@ -1739,28 +1771,37 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4ADE80',
+    borderColor: COLORS.success,
   },
   scoreText: {
-    color: '#4ADE80',
+    color: COLORS.success,
     fontSize: 12,
     fontWeight: '700',
   },
   safetyDesc: {
-    color: 'rgba(255,255,255,0.6)',
+    color: COLORS.textSecondary,
     fontSize: 13,
-    marginBottom: 15,
+    marginBottom: 12, // Reduced margin
+  },
+  intelContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingBottom: 4, // Added padding bottom
   },
   startNavBtn: {
-    backgroundColor: '#7F00FF',
-    paddingVertical: 14,
-    borderRadius: 16,
+    marginTop: 12,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12, // Reduced padding
+    borderRadius: RADIUS.m,
     alignItems: 'center',
+    ...SHADOWS.glow,
   },
   startNavText: {
     color: '#FFF',
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   // Navigation Puck
@@ -1775,13 +1816,13 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(0, 122, 255, 0.3)',
+    backgroundColor: 'rgba(56, 189, 248, 0.3)', // light blue
   },
   puckCore: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     borderWidth: 2,
     borderColor: '#FFF',
   },
@@ -1796,12 +1837,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: COLORS.card,
     borderWidth: 2,
-    borderColor: '#00F0FF',
+    borderColor: COLORS.primary,
+    ...SHADOWS.soft,
   },
   markerText: {
-    color: '#00F0FF',
+    color: COLORS.primary,
     fontWeight: '800',
   },
 
@@ -1813,14 +1855,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...SHADOWS.soft,
     zIndex: 90,
   },
 
@@ -1831,14 +1869,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FFF',
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...SHADOWS.soft,
     zIndex: 100,
   },
 
@@ -1848,12 +1882,14 @@ const styles = StyleSheet.create({
     top: 130, // Adjust based on input stack height
     left: 0,
     right: 0,
-    backgroundColor: '#FFF',
-    borderRadius: 15,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.m,
     marginTop: 5,
-    elevation: 10,
     zIndex: 1000,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.card,
   },
   suggestionItem: {
     flexDirection: 'row',
@@ -1862,13 +1898,13 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontSize: 14,
-    color: '#333',
+    color: COLORS.text,
     fontWeight: '500',
     flex: 1,
   },
   separator: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.border,
   },
 
   headerSuggestionsContainer: {
@@ -1876,15 +1912,11 @@ const styles = StyleSheet.create({
     top: 110,
     left: 20,
     right: 20,
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    elevation: 20,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.m,
     zIndex: 2000,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    ...SHADOWS.card,
   },
 
   // --- SAFETY MARKERS ---
@@ -1896,23 +1928,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    backgroundColor: COLORS.card,
+    ...SHADOWS.soft,
   },
   calloutContainer: {
     width: 200,
-    backgroundColor: 'white',
-    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.m,
     padding: 10,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 10,
+    ...SHADOWS.card,
     marginBottom: 5,
   },
   calloutTitle: {
@@ -1920,15 +1945,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 2,
     textAlign: 'center',
-    color: '#000'
+    color: COLORS.text
   },
   calloutSub: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   calloutBtn: {
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.danger,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -1941,4 +1966,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
+  // Floating Controls
+  floatingControls: {
+    position: 'absolute',
+    bottom: 180,
+    right: 20,
+    zIndex: 90,
+    alignItems: 'center',
+  },
+  controlBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.soft,
+  },
 });

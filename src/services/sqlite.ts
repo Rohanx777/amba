@@ -33,97 +33,124 @@ async function exec(sql: string, params: any[] = []) {
 }
 
 export async function initDB() {
-  // Users table with authentication fields
-  await exec(`CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    full_name TEXT,
-    password_hash TEXT NOT NULL,
-    created_at INTEGER
-  );`);
+  console.log("💾 SQLite: Initializing Database...");
+  try {
+    const db = await getDB();
 
-  // Authentication sessions table
-  await exec(`CREATE TABLE IF NOT EXISTS auth_sessions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    token TEXT UNIQUE NOT NULL,
-    expires_at INTEGER NOT NULL,
-    created_at INTEGER,
-    FOREIGN KEY (user_id) REFERENCES users (id)
-  );`);
+    // 1. Users table
+    await exec(`CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      full_name TEXT,
+      password_hash TEXT NOT NULL,
+      created_at INTEGER
+    );`);
 
-  await exec(`CREATE TABLE IF NOT EXISTS profiles (
-    user_id TEXT PRIMARY KEY,
-    full_name TEXT,
-    dark_mode INTEGER DEFAULT 0,
-    created_at INTEGER,
-    updated_at INTEGER
-  );`);
+    // 2. Auth Sessions
+    await exec(`CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    );`);
 
-  await exec(`CREATE TABLE IF NOT EXISTS emergency_contacts (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    name TEXT,
-    phone TEXT,
-    relation TEXT,
-    is_primary INTEGER DEFAULT 0,
-    created_at INTEGER
-  );`);
+    // 3. Profiles (Updated Schema)
+    await exec(`CREATE TABLE IF NOT EXISTS profiles (
+      user_id TEXT PRIMARY KEY,
+      full_name TEXT,
+      dark_mode INTEGER DEFAULT 0,
+      created_at INTEGER,
+      updated_at INTEGER,
+      medical_condition TEXT,
+      guardian_name TEXT,
+      guardian_phone TEXT,
+      is_onboarding_complete INTEGER DEFAULT 0
+    );`);
 
-  await exec(`CREATE TABLE IF NOT EXISTS saved_addresses (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    label TEXT,
-    address_text TEXT,
-    latitude REAL,
-    longitude REAL,
-    created_at INTEGER
-  );`);
+    // 4. Emergency Contacts (Updated Schema)
+    await exec(`CREATE TABLE IF NOT EXISTS emergency_contacts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      name TEXT,
+      phone TEXT,
+      relation TEXT,
+      is_primary INTEGER DEFAULT 0,
+      created_at INTEGER,
+      avatar_uri TEXT,
+      relationship_label TEXT,
+      is_active_simulated INTEGER DEFAULT 0
+    );`);
 
-  // --- MIGRATIONS ---
-  // Upgrade emergency_contacts with new columns for "Nano Banana Pro" UI
-  const migrationCols = [
-    { name: 'avatar_uri', def: 'TEXT' },
-    { name: 'relationship_label', def: 'TEXT' },
-    { name: 'is_active_simulated', def: 'INTEGER DEFAULT 0' }
-  ];
+    // 5. Saved Addresses
+    await exec(`CREATE TABLE IF NOT EXISTS saved_addresses (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      label TEXT,
+      address_text TEXT,
+      latitude REAL,
+      longitude REAL,
+      created_at INTEGER
+    );`);
 
-  for (const col of migrationCols) {
-    try {
-      await exec(`ALTER TABLE emergency_contacts ADD COLUMN ${col.name} ${col.def};`);
-    } catch (e) {
-      // Column likely already exists, ignore error
-      // console.log(`Column ${col.name} already exists or could not be added.`);
+    // 6. Alert History
+    await exec(`CREATE TABLE IF NOT EXISTS alert_history (
+      id TEXT PRIMARY KEY,
+      type TEXT, 
+      timestamp INTEGER,
+      location_snapshot TEXT,
+      is_synced INTEGER DEFAULT 0
+    );`);
+
+    // 7. App Settings
+    await exec(`CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );`);
+
+    // 8. Audio Logs (Updated Schema)
+    await exec(`CREATE TABLE IF NOT EXISTS audio_logs (
+      id TEXT PRIMARY KEY,
+      uri TEXT NOT NULL,
+      timestamp INTEGER,
+      duration TEXT,
+      uploaded INTEGER DEFAULT 0
+    );`);
+
+    // --- BRUTE FORCE MIGRATIONS (For existing installs) ---
+    // If the tables already existed with old schema, these ensure columns are added.
+    // We catch errors (like "duplicate column") silently.
+
+    const runMigration = async (sql: string) => {
+      try {
+        await exec(sql);
+        console.log(`✨ Migration success: ${sql}`);
+      } catch (e: any) {
+        // Ignore "duplicate column" error
+        if (!e.message?.includes('duplicate column')) {
+          console.log(`⚠️ Migration note: ${e.message}`);
+        }
+      }
     }
+
+    await runMigration(`ALTER TABLE audio_logs ADD COLUMN uploaded INTEGER DEFAULT 0;`);
+    await runMigration(`ALTER TABLE emergency_contacts ADD COLUMN avatar_uri TEXT;`);
+    await runMigration(`ALTER TABLE emergency_contacts ADD COLUMN relationship_label TEXT;`);
+    await runMigration(`ALTER TABLE emergency_contacts ADD COLUMN is_active_simulated INTEGER DEFAULT 0;`);
+    await runMigration(`ALTER TABLE profiles ADD COLUMN is_onboarding_complete INTEGER DEFAULT 0;`);
+    await runMigration(`ALTER TABLE profiles ADD COLUMN medical_condition TEXT;`);
+    await runMigration(`ALTER TABLE profiles ADD COLUMN guardian_name TEXT;`);
+    await runMigration(`ALTER TABLE profiles ADD COLUMN guardian_phone TEXT;`);
+
+    // Insert defaults
+    await exec(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('ghost_mode', 'false');`);
+
+    console.log("✅ SQLite: Initialization Complete");
+    await verifySchema();
+  } catch (error) {
+    console.error("❌ SQLite: Critical Init Failure:", error);
   }
-
-  // --- NEW TABLES ---
-  await exec(`CREATE TABLE IF NOT EXISTS alert_history (
-    id TEXT PRIMARY KEY,
-    type TEXT, -- 'SOS_SENT', 'FALSE_ALARM', 'SYSTEM_TEST'
-    timestamp INTEGER,
-    location_snapshot TEXT, -- JSON string of {latitude, longitude}
-    is_synced INTEGER DEFAULT 0
-  );`);
-
-  await exec(`CREATE TABLE IF NOT EXISTS app_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );`);
-
-  await exec(`CREATE TABLE IF NOT EXISTS audio_logs (
-    id TEXT PRIMARY KEY,
-    uri TEXT NOT NULL,
-    timestamp INTEGER,
-    duration TEXT
-  );`);
-  console.log("LOG Table: audio_logs checked/created");
-
-  // Insert default settings if they don't exist
-  await exec(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('ghost_mode', 'false');`);
-
-  // Verify schema after updates
-  await verifySchema();
 }
 
 /**
@@ -131,18 +158,18 @@ export async function initDB() {
  * Call this manually or from initDB during development.
  */
 export async function verifySchema() {
-  console.log('--- Verifying Database Schema ---');
+  if (__DEV__) console.log('--- Verifying Database Schema ---');
   try {
-    const tables = ['emergency_contacts', 'alert_history', 'app_settings'];
+    const tables = ['emergency_contacts', 'alert_history', 'app_settings', 'audio_logs'];
     for (const table of tables) {
       const info = await query(`PRAGMA table_info(${table})`);
-      console.log(`Table: ${table}`);
+      console.log(`Table: ${table} `);
       console.log(info.map((col: any) => ` - ${col.name} (${col.type})`).join('\n'));
     }
   } catch (error) {
     console.error('Error verifying schema:', error);
   }
-  console.log('--- Schema Verification Complete ---');
+  if (__DEV__) console.log('--- Schema Verification Complete ---');
 }
 
 export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
@@ -240,7 +267,7 @@ export async function validateSession(token: string): Promise<User | null> {
     `SELECT s.*, u.id, u.email, u.full_name, u.created_at as user_created_at 
      FROM auth_sessions s 
      JOIN users u ON s.user_id = u.id 
-     WHERE s.token = ? AND s.expires_at > ?`,
+     WHERE s.token = ? AND s.expires_at > ? `,
     [token, now]
   );
 
@@ -269,7 +296,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 export async function addEmergencyContact(contact: { id: string, name: string, phone: string, userId: string }) {
   const db = await getDB();
   await db.runAsync(
-    `INSERT OR REPLACE INTO emergency_contacts (id, user_id, name, phone, created_at) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO emergency_contacts(id, user_id, name, phone, created_at) VALUES(?, ?, ?, ?, ?)`,
     [contact.id, contact.userId, contact.name, contact.phone, Date.now()]
   );
 }
@@ -283,18 +310,41 @@ export async function getEmergencyContacts(userId: string): Promise<{ name: stri
 }
 
 
-export async function saveAudioLog(log: { id: string, uri: string, timestamp: number, duration: string }) {
-  const db = await getDB();
-  await db.runAsync(
-    `INSERT INTO audio_logs (id, uri, timestamp, duration) VALUES (?, ?, ?, ?)`,
-    [log.id, log.uri, log.timestamp, log.duration]
-  );
+export async function saveAudioLog(log: { id: string, uri: string, timestamp: number, duration: string, uploaded?: number }) {
+  try {
+    const db = await getDB();
+    console.log(`💾 SQLite: Saving audio log ${log.id}...`);
+    await db.runAsync(
+      'INSERT INTO audio_logs (id, uri, timestamp, duration, uploaded) VALUES (?, ?, ?, ?, ?);',
+      [log.id, log.uri, log.timestamp, log.duration, log.uploaded ?? 0]
+    );
+    console.log(`✅ SQLite: Audio log saved successfully.`);
+  } catch (error) {
+    console.error('❌ SQLite: Check audio logs error', error);
+  }
 }
 
-export async function getAudioLogs() {
-  return await query<{ id: string, uri: string, timestamp: number, duration: string }>(
-    'SELECT * FROM audio_logs ORDER BY timestamp DESC'
-  );
+export async function getAudioLogs(): Promise<{ id: string, uri: string, timestamp: number, duration: string, uploaded: number }[]> {
+  try {
+    const db = await getDB();
+    console.log("📂 SQLite: Fetching audio logs...");
+    const result = await db.getAllAsync<{ id: string, uri: string, timestamp: number, duration: string, uploaded: number }>('SELECT * FROM audio_logs ORDER BY timestamp DESC;');
+    console.log(`📂 SQLite: Found ${result.length} logs.`);
+    return result;
+  } catch (error) {
+    console.error('❌ SQLite: Get audio logs error', error);
+    return [];
+  }
+}
+
+export async function markAudioUploaded(id: string) {
+  const db = await getDB();
+  await db.runAsync('UPDATE audio_logs SET uploaded = 1 WHERE id = ?', [id]);
+}
+
+export async function deleteAudioLog(id: string) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM audio_logs WHERE id = ?', [id]);
 }
 
 // App Settings helpers (key-value store)

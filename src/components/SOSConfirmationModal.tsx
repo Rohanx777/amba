@@ -97,12 +97,13 @@ export default function SOSConfirmationModal({
       });
 
       // B: Play Siren (Local Asset for Offline Reliability)
-      console.log("🔊 LOADING LOCAL ASSET: siren.mp3");
-      const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.mp3'),
-        { isLooping: true, shouldPlay: true, volume: 1.0 }
-      );
-      soundRef.current = sound;
+      // B: Play Siren (Local Asset for Offline Reliability)
+      // console.log("🔊 LOADING LOCAL ASSET: siren.mp3");
+      // const { sound } = await Audio.Sound.createAsync(
+      //   require('../../assets/siren.mp3'),
+      //   { isLooping: true, shouldPlay: true, volume: 1.0 }
+      // );
+      // soundRef.current = sound;
 
       // C: Start Strobe
       let toggle = false;

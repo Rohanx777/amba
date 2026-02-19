@@ -4,7 +4,8 @@ import {
   User as SqliteUser,
   createUser as createLocalUser,
   authenticateUser as authenticateLocalUser,
-  getUserByEmail
+  getUserByEmail,
+  createSession
 } from '../services/sqlite';
 import { Profile, getProfile, upsertProfile } from '../services/profileService';
 import * as WebBrowser from 'expo-web-browser';
@@ -33,6 +34,8 @@ export type AuthContextType = {
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => Promise<void>;
+  completeOnboarding: (data?: { medicalCondition?: string; guardianName?: string; guardianPhone?: string }) => Promise<void>;
+  didJustSignup: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,23 +44,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [didJustSignup, setDidJustSignup] = useState(false);
+
+  const completeOnboarding = async (data?: { medicalCondition?: string; guardianName?: string; guardianPhone?: string }) => {
+    if (user && data) {
+      // 1. Save to Supabase (Profiles table)
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            medical_condition: data.medicalCondition,
+            guardian_name: data.guardianName,
+            guardian_phone: data.guardianPhone,
+            is_onboarding_complete: true, // Mark as complete
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+
+        if (error) console.error("Supabase onboarding save error:", error);
+      } catch (e) {
+        console.error("Supabase onboarding exception:", e);
+      }
+
+      // 2. Save locally
+      try {
+        await upsertProfile(user.id, {
+          medical_condition: data.medicalCondition,
+          guardian_name: data.guardianName,
+          guardian_phone: data.guardianPhone,
+          is_onboarding_complete: true, // Mark as complete
+        });
+      } catch (e) {
+        console.error("Local onboarding save error:", e);
+      }
+    }
+    setDidJustSignup(false);
+  };
 
   // Detect Supabase Auth State
   useEffect(() => {
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const appUser: AppUser = {
-          id: session.user.id,
-          email: session.user.email ?? null,
-          fullName: session.user.user_metadata?.full_name,
-        };
-        setUser(appUser);
-        loadUserProfile(appUser.id);
-      } else {
+    // Check initial session with timeout
+    const initSession = async () => {
+      try {
+        const { data: { session }, error } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]) as any;
+
+        if (session?.user) {
+          const appUser: AppUser = {
+            id: session.user.id,
+            email: session.user.email ?? null,
+            fullName: session.user.user_metadata?.full_name,
+          };
+          setUser(appUser);
+          loadUserProfile(appUser.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (e) {
+        console.warn('Auth check timed out or failed, falling back to false', e);
         setLoading(false);
       }
-    });
+    };
+
+    initSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -85,6 +137,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUserProfile = async (userId: string) => {
     try {
+      let loadedProfile: Profile | null = null;
+
       // Try Supabase first
       const { data, error } = await supabase
         .from('profiles')
@@ -93,12 +147,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (data && !error) {
-        setProfile(data as Profile);
+        loadedProfile = data as Profile;
       } else {
         // Fallback to local profileService
-        const localProfile = await getProfile(userId);
-        setProfile(localProfile);
+        loadedProfile = await getProfile(userId);
       }
+
+      setProfile(loadedProfile);
+
+      // Check for incomplete onboarding
+      // If profile exists but onboarding is NOT complete, trigger the flow
+      if (loadedProfile && !loadedProfile.is_onboarding_complete) {
+        setDidJustSignup(true);
+      }
+
     } catch (e) {
       console.log("Error loading profile", e);
     } finally {
@@ -162,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const supabaseUserId = data.user?.id;
 
       if (supabaseUserId) {
-        // 2. Update profile with full_name (trigger creates the row, we update it)
+        // 2. Update profile with full_name
         await supabase
           .from('profiles')
           .update({
@@ -172,18 +234,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           })
           .eq('id', supabaseUserId);
 
-        // 3. SQLite Backup
+        // 3. SQLite Backup (Create user but don't log in)
         const existing = await getUserByEmail(email);
         if (!existing) {
           await createLocalUser(email, password, fullName);
         }
 
-        // 4. Force Profile Refresh
-        await loadUserProfile(supabaseUserId);
+        // CRITICAL: We do NOT set user or didJustSignup here anymore.
+        // We want the user to explicitly log in.
+        // Ensure we are signed out just in case Supabase auto-signed in
+        await supabase.auth.signOut();
       }
-    } catch (error) {
-      console.error("Signup Error:", error);
-      throw error;
+    } catch (error: any) {
+      console.log("Supabase Signup Failed:", error.message);
+
+      // Fallback: Create Local User (Offline support)
+      try {
+        console.log('Attempting Local Signup...');
+        const existing = await getUserByEmail(email);
+        if (existing) {
+          throw new Error("User already exists (Local)");
+        }
+
+        await createLocalUser(email, password, fullName);
+        console.log("Local Signup Success");
+
+        // No auto-login for local either
+      } catch (localError: any) {
+        console.error("Local Signup Error:", localError);
+        throw error;
+      }
     } finally {
       setLoading(false);
     }
@@ -280,8 +360,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo(
-    () => ({ user, profile, loading, login, signup, loginWithGoogle, loginWithFacebook, logout, refreshProfile, updateProfile }),
-    [user, profile, loading]
+    () => ({ user, profile, loading, login, signup, loginWithGoogle, loginWithFacebook, logout, refreshProfile, updateProfile, completeOnboarding, didJustSignup }),
+    [user, profile, loading, didJustSignup]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

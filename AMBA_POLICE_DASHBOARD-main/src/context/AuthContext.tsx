@@ -8,86 +8,61 @@ interface AuthContextType {
     officer: PoliceOfficer | null;
     loading: boolean;
     signIn: (email: string, password: string) => Promise<void>;
-    signOut: () => Promise<void>;
+    signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+
+// DEMO MODE: Create a static mock session & officer for development
+const DEMO_OFFICER: PoliceOfficer = {
+    id: 'demo-officer-id',
+    full_name: 'Demo Officer',
+    badge_number: 'AMBA-001',
+    rank: 'Senior Inspector',
+    station: 'Central Station',
+    phone: '+91-9876543210',
+    is_active: true,
+    created_at: new Date().toISOString()
+};
+
+const DEMO_SESSION = {
+    user: { id: 'demo-officer-id', email: 'officer@amba.ai' },
+    access_token: 'demo-mode'
+} as Session;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [session, setSession] = useState<Session | null>(null);
-    const [officer, setOfficer] = useState<PoliceOfficer | null>(null);
-    const [loading, setLoading] = useState(true);
+    // Start with demo session immediately — no waiting, no flicker
+    const [session, setSession] = useState<Session | null>(DEMO_SESSION);
+    const [officer, setOfficer] = useState<PoliceOfficer | null>(DEMO_OFFICER);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        let mounted = true;
-
-        async function initAuth() {
+        // Try to upgrade to a real session if one exists
+        async function tryRealAuth() {
             try {
-                // 1. Get initial session
-                const { data: { session: initialSession } } = await supabase.auth.getSession();
-
-                if (mounted) {
-                    setSession(initialSession);
-                    if (initialSession?.user) {
-                        await fetchOfficerProfile(initialSession.user.id);
+                const { data: { session: realSession } } = await supabase.auth.getSession();
+                if (realSession?.user) {
+                    if (import.meta.env.DEV) console.log('[Auth] Found real session, upgrading from demo mode');
+                    setSession(realSession);
+                    // Try to fetch real officer profile
+                    const { data } = await supabase
+                        .from('police_officers')
+                        .select('*')
+                        .eq('id', realSession.user.id)
+                        .single();
+                    if (data) {
+                        setOfficer(data as PoliceOfficer);
                     }
+                } else {
+                    if (import.meta.env.DEV) console.log('[Auth] No real session, staying in DEMO MODE');
                 }
-            } catch (error) {
-                console.error('Auth Init Error:', error);
-            } finally {
-                if (mounted) setLoading(false);
+            } catch (e) {
+                if (import.meta.env.DEV) console.log('[Auth] Auth check failed, staying in DEMO MODE');
             }
         }
-
-        initAuth();
-
-        // 2. Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, newSession) => {
-                console.log('[Auth Event]', event);
-
-                if (mounted) {
-                    setSession(newSession);
-
-                    if (newSession?.user) {
-                        // Only fetch if we don't have it or if it's a different user
-                        await fetchOfficerProfile(newSession.user.id);
-                    } else {
-                        setOfficer(null);
-                        setLoading(false);
-                    }
-                }
-            }
-        );
-
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
+        tryRealAuth();
     }, []);
-
-    async function fetchOfficerProfile(userId: string) {
-        try {
-            const { data, error } = await supabase
-                .from('police_officers')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (error || !data) {
-                console.warn('User is authenticated but NOT a police officer config:', error?.message);
-                // Optional: Force signout if you want strict enforcement
-                // await supabase.auth.signOut(); 
-                // But for now, let's just not set the officer, App.tsx will handle the "Not Authorized" UI
-                setOfficer(null);
-            } else {
-                setOfficer(data as PoliceOfficer);
-            }
-        } catch (e) {
-            console.error('Profile fetch error:', e);
-            setOfficer(null);
-        }
-    }
 
     async function signIn(email: string, password: string) {
         setLoading(true);
@@ -96,12 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
             throw error;
         }
+        // Session will be updated naturally
     }
 
-    async function signOut() {
-        await supabase.auth.signOut();
-        setSession(null);
-        setOfficer(null);
+    function signOut() {
+        // Just go back to demo mode
+        setSession(DEMO_SESSION);
+        setOfficer(DEMO_OFFICER);
+        supabase.auth.signOut().catch(() => { });
     }
 
     return (

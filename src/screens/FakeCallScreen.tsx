@@ -1,24 +1,21 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
 
 const { width, height } = Dimensions.get('window');
 
 // 🎵 RELIABLE RINGTONE URLS (Google Cloud Storage)
-// We use these because SoundJay/University URLs often fail with 404 or DNS/Extractor errors.
 const RINGTONES: Record<string, string> = {
-    // Apple Style (Theme Ring)
     'Apple': 'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/theme_01.mp3',
-    // Samsung/Android Style (Digital Phone Ring)
     'Samsung': 'https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a',
     'Xiaomi': 'https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a',
     'Redmi': 'https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a',
-    // Fallback
     'default': 'https://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a'
 };
 
@@ -40,13 +37,10 @@ export default function FakeCallScreen() {
             if (callState !== 'incoming') return;
 
             try {
-                // Step 1: Detect Brand
                 const brand = Device.brand || 'default';
                 console.log("📱 Detected Brand:", brand);
 
-                // Step 2: Select Sound
                 let ringtoneUrl = RINGTONES['default'];
-                // Case-insensitive check
                 for (const key of Object.keys(RINGTONES)) {
                     if (brand.toLowerCase().includes(key.toLowerCase())) {
                         ringtoneUrl = RINGTONES[key];
@@ -56,8 +50,6 @@ export default function FakeCallScreen() {
 
                 console.log(`🎵 Loading Ringtone: ${ringtoneUrl}`);
 
-                // Step 3: Play Sound
-                // Ensure audio plays even in silent mode
                 await Audio.setAudioModeAsync({
                     allowsRecordingIOS: false,
                     playsInSilentModeIOS: true,
@@ -82,7 +74,6 @@ export default function FakeCallScreen() {
 
         setupAudioAndPlay();
 
-        // Cleanup
         return () => {
             stopRingtone();
         };
@@ -129,17 +120,11 @@ export default function FakeCallScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#000', '#1a1a1a', '#222']}
-                style={StyleSheet.absoluteFill}
-            />
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-
+        <ScreenLayout>
             <View style={styles.content}>
                 <View style={styles.topSection}>
                     <View style={styles.avatarPlaceholder}>
-                        <Ionicons name="person" size={60} color="#ccc" />
+                        <Ionicons name="person" size={60} color={COLORS.textTertiary} />
                     </View>
                     <Text style={styles.callerName}>{callerName}</Text>
                     <Text style={styles.callStatus}>
@@ -151,14 +136,14 @@ export default function FakeCallScreen() {
                     {callState === 'incoming' ? (
                         <View style={styles.actionsRow}>
                             <TouchableOpacity style={styles.actionBtn} onPress={handleDecline}>
-                                <View style={[styles.circleBtn, { backgroundColor: '#FF3B30' }]}>
+                                <View style={[styles.circleBtn, { backgroundColor: COLORS.danger }]}>
                                     <Ionicons name="call" size={32} color="#FFF" style={{ transform: [{ rotate: '135deg' }] }} />
                                 </View>
                                 <Text style={styles.btnLabel}>Decline</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.actionBtn} onPress={handleAccept}>
-                                <View style={[styles.circleBtn, { backgroundColor: '#34C759' }]}>
+                                <View style={[styles.circleBtn, { backgroundColor: COLORS.success }]}>
                                     <Ionicons name="call" size={32} color="#FFF" />
                                 </View>
                                 <Text style={styles.btnLabel}>Accept</Text>
@@ -167,12 +152,12 @@ export default function FakeCallScreen() {
                     ) : (
                         <View style={styles.activeActions}>
                             <View style={{ marginBottom: 40, alignItems: 'center' }}>
-                                <Ionicons name="mic-outline" size={32} color="#FFF" style={{ opacity: 0.5, marginBottom: 10 }} />
-                                <Text style={{ color: '#aaa' }}>Mute</Text>
+                                <Ionicons name="mic-outline" size={32} color={COLORS.text} style={{ opacity: 0.5, marginBottom: 10 }} />
+                                <Text style={{ color: COLORS.textSecondary }}>Mute</Text>
                             </View>
 
                             <TouchableOpacity style={styles.actionBtn} onPress={handleDecline}>
-                                <View style={[styles.circleBtn, { backgroundColor: '#FF3B30', width: 80, height: 80 }]}>
+                                <View style={[styles.circleBtn, { backgroundColor: COLORS.danger, width: 80, height: 80 }]}>
                                     <Ionicons name="call" size={40} color="#FFF" style={{ transform: [{ rotate: '135deg' }] }} />
                                 </View>
                             </TouchableOpacity>
@@ -180,15 +165,11 @@ export default function FakeCallScreen() {
                     )}
                 </View>
             </View>
-        </View>
+        </ScreenLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#000',
-    },
     content: {
         flex: 1,
         paddingVertical: 80,
@@ -199,23 +180,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     avatarPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: '#333',
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: COLORS.card,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: SPACING.l,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.soft,
     },
     callerName: {
         fontSize: 36,
         fontWeight: '600',
-        color: '#FFF',
+        color: COLORS.text,
         marginBottom: 10,
     },
     callStatus: {
         fontSize: 18,
-        color: '#ccc',
+        color: COLORS.textSecondary,
         letterSpacing: 1,
     },
     bottomSection: {
@@ -241,9 +225,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 10,
+        ...SHADOWS.card,
     },
     btnLabel: {
-        color: '#FFF',
+        color: COLORS.text,
         fontSize: 14,
         fontWeight: '500',
     }

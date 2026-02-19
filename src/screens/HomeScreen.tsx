@@ -1,385 +1,402 @@
-import React, { useRef } from 'react';
-import {
-    StyleSheet,
-    Text,
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Dimensions,
-    Alert,
-    Linking,
-    Platform,
-    StatusBar,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useContext } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as Location from 'expo-location';
-import { BlurView } from 'expo-blur';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { Zap, MapPin, BellRing, Lock, Heart, ChevronRight, Activity } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { useTheme } from '../context/ThemeContext';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { GuardianHeader } from '../components/GuardianHeader';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme/guardianTheme';
+import MOCK_VOLUNTEERS from '../data/MockVolunteers';
+import { MenuContext } from '../context/MenuContext';
 import { useSOS } from '../context/SOSContext';
-import { BreathingOrb } from '../components/BreathingOrb';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = () => {
-    const { colors } = useTheme(); // We can use this for safe/danger colors if needed
     const navigation = useNavigation<any>();
-    const { startSOSConfirmation } = useSOS();
+    const { toggleMenu } = useContext(MenuContext);
+    const { sendSOSAlert } = useSOS();
+    const { user } = useAuth();
 
-    // -- LOGIC PRESERVED --
-    const handleSOS = () => {
-        startSOSConfirmation();
-    };
+    // Mock Data
+    const nearbyVolunteers = MOCK_VOLUNTEERS.length + 9; // Mock total
+    const userName = user?.fullName || "Guardian"; // Dynamic Name
 
-    const shareLocation = async () => {
-        try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Location permission is required.');
-                return;
-            }
-            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            const { latitude, longitude } = location.coords;
-            const message = `Hi! I'm sharing my live location: https://maps.google.com/?q=${latitude},${longitude}`;
-            const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
-
-            const canOpen = await Linking.canOpenURL(whatsappUrl);
-            if (canOpen) {
-                await Linking.openURL(whatsappUrl);
-            } else {
-                const webUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-                await Linking.openURL(webUrl);
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Could not share location.');
-        }
-    };
-
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-
-            {/* Background: Deep Black to Midnight Blue */}
+    const QuickAction = ({ icon: Icon, color, label, subLabel, onPress, gradientColors }: any) => (
+        <TouchableOpacity
+            style={styles.actionCard}
+            onPress={onPress}
+            activeOpacity={0.9}
+        >
             <LinearGradient
-                colors={['#050505', '#1A0033']}
+                colors={gradientColors}
                 style={StyleSheet.absoluteFill}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-            />
-
-            {/* Aurora Effect (Subtle) */}
-            <LinearGradient
-                colors={['rgba(127, 0, 255, 0.15)', 'transparent']}
-                style={[StyleSheet.absoluteFill, { height: '60%' }]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             />
+            <View style={[styles.iconCircle, { backgroundColor: color + '20' }]}>
+                <Icon size={24} color={color} />
+            </View>
+            <Text style={styles.actionLabel}>{label}</Text>
+            <Text style={styles.actionSubLabel}>{subLabel}</Text>
+        </TouchableOpacity>
+    );
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    return (
+        <ScreenLayout noPadding>
+            <GuardianHeader
+                onNotificationPress={() => navigation.navigate('Notifications')}
+                onMenuPress={toggleMenu}
+                hasNotifications
+            />
 
-                {/* Header */}
-                <Animated.View entering={FadeIn.duration(800)} style={styles.headerWrapper}>
-                    <BlurView intensity={20} tint="dark" style={styles.glassHeader}>
-                        <View>
-                            <Text style={styles.brandTitle}>Amba</Text>
-                            <Text style={styles.brandSubtitle}>Your Guardian</Text>
-                        </View>
-                        <TouchableOpacity style={styles.notificationBtn}>
-                            <Text style={styles.bellIcon}>🔔</Text>
-                            <View style={styles.notifBadge} />
-                        </TouchableOpacity>
-                    </BlurView>
-                </Animated.View>
-
-                {/* Main Action: Breathing Orb */}
-                <Animated.View entering={FadeIn.delay(200).duration(1000)} style={styles.orbContainer}>
-                    <BreathingOrb onSOS={handleSOS} />
-
-                    {/* Status Pill */}
-                    <View style={styles.statusPill}>
-                        <BlurView intensity={10} tint="light" style={styles.pillBlur}>
-                            <View style={styles.statusDot} />
-                            <Text style={styles.statusText}>HOLD TO ALERT</Text>
-                        </BlurView>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Welcome Section */}
+                <View style={styles.headerSection}>
+                    <View style={styles.avatarContainer}>
+                        <LinearGradient
+                            colors={[COLORS.background, '#E2E8F0']}
+                            style={styles.avatarPlaceholder}
+                        >
+                            <Text style={styles.avatarText}>{userName[0]}</Text>
+                        </LinearGradient>
                     </View>
-                </Animated.View>
+                    <View>
+                        <Text style={styles.welcomeText}>Welcome Back</Text>
+                        <Text style={styles.userName}>{userName}</Text>
+                    </View>
+                </View>
 
-                {/* Functionality Grid */}
-                <Animated.View entering={SlideInDown.delay(400).springify()} style={styles.gridContainer}>
+                {/* Hero Card: Protection Status */}
+                <View style={[styles.heroCard, SHADOWS.card]}>
+                    <View style={styles.heroContent}>
+                        <View style={styles.statusPill}>
+                            <View style={styles.pingDot}>
+                                <View style={styles.pingInner} />
+                                <View style={styles.pingRing} />
+                            </View>
+                            <Text style={styles.statusText}>ACTIVE</Text>
+                        </View>
+                        <Text style={styles.heroTitle}>You are{'\n'}Protected</Text>
+                        <Text style={styles.heroSubtitle}>
+                            {nearbyVolunteers} Guardians in your vicinity
+                        </Text>
+                    </View>
 
-                    {/* Track Me */}
-                    <TouchableOpacity
-                        activeOpacity={0.7}
-                        style={styles.tileWrapper}
+                    {/* Abstract Shield Graphic */}
+                    <View style={styles.shieldGraphic}>
+                        <Image
+                            source={{ uri: "https://img.freepik.com/free-vector/young-woman-white_25030-39527.jpg" }}
+                            style={styles.heroImage}
+                            resizeMode="contain"
+                        />
+                        <LinearGradient
+                            colors={['transparent', 'rgba(255,255,255,0.8)']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    </View>
+                </View>
+
+                {/* Quick Actions Grid */}
+                <View style={styles.sectionHeader}>
+                    <Zap size={16} color={COLORS.warning} fill={COLORS.warning} />
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                </View>
+
+                <View style={styles.gridContainer}>
+                    <QuickAction
+                        icon={MapPin}
+                        color={COLORS.primary}
+                        label="Safe Route"
+                        subLabel="AI Navigation"
+                        gradientColors={['#EFF6FF', '#DBEAFE']}
                         onPress={() => navigation.navigate('Navigate')}
-                    >
-                        <BlurView intensity={20} tint="dark" style={styles.glassTile}>
-                            <View style={[styles.iconCircle, { backgroundColor: 'rgba(0, 240, 255, 0.1)' }]}>
-                                <Text style={styles.tileIcon}>🗺️</Text>
-                            </View>
-                            <Text style={styles.tileLabel}>Track Me</Text>
-                        </BlurView>
-                    </TouchableOpacity>
+                    />
+                    <QuickAction
+                        icon={BellRing}
+                        color={COLORS.danger}
+                        label="Siren"
+                        subLabel="Loud Alarm"
+                        gradientColors={['#FEF2F2', '#FEE2E2']}
+                        onPress={() => sendSOSAlert()} // Trigger SOS
+                    />
+                    <QuickAction
+                        icon={Lock}
+                        color={COLORS.textSecondary}
+                        label="Evidence"
+                        subLabel="Blockchain"
+                        gradientColors={['#F8FAFC', '#F1F5F9']}
+                        onPress={() => navigation.navigate('Profile', { screen: 'AudioEvidence' })} // Navigate to Evidence
+                    />
+                    <QuickAction
+                        icon={Heart}
+                        color="#DB2777"
+                        label="Wellness"
+                        subLabel="AI Support"
+                        gradientColors={['#FDF2F8', '#FCE7F3']}
+                        onPress={() => navigation.navigate('Chat')} // Navigate to Chat
+                    />
+                </View>
 
-                    {/* Safe Route */}
-                    <TouchableOpacity
-                        activeOpacity={0.7}
-                        style={styles.tileWrapper}
-                        onPress={() => navigation.navigate('Safety')}
-                    >
-                        <BlurView intensity={20} tint="dark" style={styles.glassTile}>
-                            <View style={[styles.iconCircle, { backgroundColor: 'rgba(127, 0, 255, 0.1)' }]}>
-                                <Text style={styles.tileIcon}>🛡️</Text>
-                            </View>
-                            <Text style={styles.tileLabel}>Safe Route</Text>
-                        </BlurView>
-                    </TouchableOpacity>
-
-                    {/* Share Location */}
-                    <TouchableOpacity
-                        activeOpacity={0.7}
-                        style={styles.tileWrapper}
-                        onPress={shareLocation}
-                    >
-                        <BlurView intensity={20} tint="dark" style={styles.glassTile}>
-                            <View style={[styles.iconCircle, { backgroundColor: 'rgba(50, 255, 100, 0.1)' }]}>
-                                <Text style={styles.tileIcon}>📍</Text>
-                            </View>
-                            <Text style={styles.tileLabel}>Share Loc</Text>
-                        </BlurView>
-                    </TouchableOpacity>
-
-                </Animated.View>
-
-                {/* Safety Score Widget */}
-                <Animated.View entering={SlideInDown.delay(600).springify()} style={styles.widgetWrapper}>
-                    <BlurView intensity={15} tint="dark" style={styles.scoreWidget}>
-                        <View style={styles.widgetRow}>
-                            <View>
-                                <Text style={styles.widgetLabel}>CURRENT SAFETY</Text>
-                                <Text style={styles.widgetSub}>Connaught Place, New Delhi</Text>
-                            </View>
-                            <View style={styles.scoreCircle}>
-                                <Text style={styles.scoreVal}>85</Text>
-                            </View>
+                {/* Community Insight Card */}
+                <TouchableOpacity style={styles.communityCard} activeOpacity={0.95}>
+                    <LinearGradient
+                        colors={[COLORS.primary, '#4F46E5']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.communityContent}>
+                        <View style={styles.communityHeader}>
+                            <Activity size={16} color="#BFDBFE" />
+                            <Text style={styles.communityTitle}>Community Insight</Text>
                         </View>
-                        <View style={styles.zoneIndicator}>
-                            <View style={[styles.zoneDot, { backgroundColor: '#4ADE80' }]} />
-                            <Text style={styles.zoneText}>SAFE ZONE</Text>
+                        <Text style={styles.communityText}>
+                            Sector 18 Market reporting higher safety score today.
+                        </Text>
+                        <View style={styles.communityAction}>
+                            <Text style={styles.communityBtnText}>View Heatmap</Text>
+                            <ChevronRight size={14} color="white" />
                         </View>
-                    </BlurView>
-                </Animated.View>
+                    </View>
+                    <MapPin
+                        size={120}
+                        color="white"
+                        style={styles.communityIconBg}
+                    />
+                </TouchableOpacity>
 
+                {/* Padding for Bottom Nav */}
+                <View style={{ height: 100 }} />
             </ScrollView>
-        </View>
+        </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#050505',
-    },
     scrollContent: {
-        paddingTop: Platform.OS === 'ios' ? 60 : 50,
-        paddingBottom: 120,
-        flexGrow: 1,
+        paddingHorizontal: SPACING.l,
+        paddingBottom: SPACING.xl,
     },
-    headerWrapper: {
-        paddingHorizontal: 24,
-        marginBottom: 40,
-    },
-    glassHeader: {
+    headerSection: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        marginBottom: SPACING.l,
+        marginTop: SPACING.s,
     },
-    brandTitle: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#FFF',
-        letterSpacing: 0.5,
+    avatarContainer: {
+        marginRight: SPACING.m,
+        ...SHADOWS.soft,
     },
-    brandSubtitle: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.5)',
-        marginTop: 2,
-    },
-    notificationBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+    avatarPlaceholder: {
+        width: 48,
+        height: 48,
+        borderRadius: RADIUS.full,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 2,
+        borderColor: COLORS.card,
     },
-    bellIcon: {
+    avatarText: {
         fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.textSecondary,
     },
-    notifBadge: {
-        position: 'absolute',
-        top: 10,
-        right: 12,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#FF2D55',
-        borderWidth: 1,
-        borderColor: '#000',
-    },
-
-    // Orb Area
-    orbContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 50,
-        height: 280,
-    },
-    statusPill: {
-        position: 'absolute',
-        bottom: 0,
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-    pillBlur: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        backgroundColor: 'rgba(0,0,0,0.4)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#FF2D55',
-        marginRight: 8,
-        shadowColor: '#FF2D55',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 6,
-    },
-    statusText: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 12,
+    welcomeText: {
+        fontSize: 10,
         fontWeight: '700',
+        color: COLORS.textSecondary,
+        textTransform: 'uppercase',
         letterSpacing: 1,
     },
-
-    // Grid
-    gridContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 24,
-        marginBottom: 30,
-        gap: 12,
+    userName: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.text,
     },
-    tileWrapper: {
-        flex: 1,
-        height: 110,
-        borderRadius: 24,
+
+    // Hero Card
+    heroCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: RADIUS.xl,
+        height: 180,
+        flexDirection: 'row',
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: 'white',
+        marginBottom: SPACING.xl,
     },
-    glassTile: {
+    heroContent: {
         flex: 1,
-        justifyContent: 'center',
+        padding: SPACING.l,
+        zIndex: 10,
+    },
+    statusPill: {
+        flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: COLORS.successBg,
+        paddingHorizontal: SPACING.s,
+        paddingVertical: 4,
+        borderRadius: RADIUS.full,
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderColor: '#DCFCE7',
+        marginBottom: SPACING.m,
+    },
+    pingDot: {
+        width: 12,
+        height: 12,
+        marginRight: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pingInner: {
+        width: 6,
+        height: 6,
+        backgroundColor: COLORS.success,
+        borderRadius: RADIUS.full,
+        zIndex: 2,
+    },
+    pingRing: {
+        position: 'absolute',
+        width: 12,
+        height: 12,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.success,
+        opacity: 0.3,
+        transform: [{ scale: 1.5 }],
+    },
+    statusText: {
+        color: COLORS.success,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1,
+    },
+    heroTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: COLORS.text,
+        lineHeight: 28,
+        marginBottom: SPACING.s,
+    },
+    heroSubtitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    shieldGraphic: {
+        width: 140,
+        height: '100%',
+        marginRight: -20,
+    },
+    heroImage: {
+        width: '100%',
+        height: '100%',
+    },
+
+    // Quick Actions
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.m,
+        gap: SPACING.xs,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: COLORS.text,
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SPACING.m,
+        marginBottom: SPACING.xl,
+    },
+    actionCard: {
+        width: (width - (SPACING.l * 2) - SPACING.m) / 2,
+        height: 140,
+        borderRadius: RADIUS.l,
+        padding: SPACING.m,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     iconCircle: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
+        borderRadius: RADIUS.m,
         alignItems: 'center',
-        marginBottom: 10,
+        justifyContent: 'center',
+        marginBottom: SPACING.m,
     },
-    tileIcon: {
-        fontSize: 20,
+    actionLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 2,
     },
-    tileLabel: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
+    actionSubLabel: {
+        fontSize: 10,
         fontWeight: '600',
+        color: COLORS.textSecondary,
     },
 
-    // Widget
-    widgetWrapper: {
-        paddingHorizontal: 24,
-        marginBottom: 40,
-    },
-    scoreWidget: {
-        padding: 20,
-        borderRadius: 28,
+    // Community Card
+    communityCard: {
+        borderRadius: RADIUS.l,
+        padding: SPACING.l,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        minHeight: 120,
+        ...SHADOWS.glow,
     },
-    widgetRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
+    communityContent: {
+        zIndex: 10,
     },
-    widgetLabel: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 10,
-        fontWeight: '800',
-        letterSpacing: 1.5,
-        marginBottom: 6,
-    },
-    widgetSub: {
-        color: '#FFF',
-        fontSize: 15,
-        fontWeight: '500',
-    },
-    scoreCircle: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: 'rgba(74, 222, 128, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(74, 222, 128, 0.3)',
-    },
-    scoreVal: {
-        color: '#4ADE80',
-        fontSize: 20,
-        fontWeight: '800',
-    },
-    zoneIndicator: {
+    communityHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: SPACING.s,
+        marginBottom: SPACING.xs,
     },
-    zoneDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginRight: 8,
-    },
-    zoneText: {
-        color: '#4ADE80',
-        fontSize: 12,
+    communityTitle: {
+        color: 'white',
         fontWeight: '700',
-        letterSpacing: 0.5,
+        fontSize: 16,
+    },
+    communityText: {
+        color: '#DBEAFE',
+        fontSize: 12,
+        lineHeight: 18,
+        marginBottom: SPACING.m,
+        maxWidth: '80%',
+    },
+    communityAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignSelf: 'flex-start',
+        paddingHorizontal: SPACING.m,
+        paddingVertical: 6,
+        borderRadius: RADIUS.m,
+        gap: 4,
+    },
+    communityBtnText: {
+        color: 'white',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    communityIconBg: {
+        position: 'absolute',
+        bottom: -20,
+        right: -20,
+        opacity: 0.1,
+        transform: [{ rotate: '-15deg' }],
     },
 });
 

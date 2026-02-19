@@ -42,6 +42,8 @@ export interface Place {
     latitude: number;
     longitude: number;
   };
+  rating?: number;
+  userRatingCount?: number;
   distance?: number; // Optional: to store calculated distance
 }
 
@@ -86,7 +88,7 @@ export async function searchNearbyPlaces(
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': EXPO_PUBLIC_GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount',
     },
     body: JSON.stringify(requestBody),
   });

@@ -1,185 +1,249 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, interpolateColor } from 'react-native-reanimated';
+import { Home, Map, Shield, User, MessageCircle } from 'lucide-react-native';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SHADOWS, RADIUS, SPACING } from '../theme/guardianTheme';
+import { useSOS } from '../context/SOSContext';
 
 const { width } = Dimensions.get('window');
-const TAB_WIDTH = width - 40; // 20px padding on each side
 
-export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+    const { startSOSConfirmation } = useSOS();
+
     return (
-        <View style={styles.container}>
-            <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
-                {/* Optional: Aurora Gradient behind the blur for extra pop */}
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.5)', 'rgba(20,0,40,0.5)']}
-                    style={StyleSheet.absoluteFill}
-                />
+        <View style={styles.wrapper}>
+            <View style={styles.container}>
+                {/* Background Pill */}
+                <View style={[styles.pillContainer, SHADOWS.card]}>
+                    {/* Top Border Gradient Line */}
+                    <LinearGradient
+                        colors={['transparent', COLORS.primary, 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.topBorderLine}
+                    />
 
-                <View style={styles.tabsRow}>
-                    {state.routes.map((route, index) => {
-                        const { options } = descriptors[route.key];
-                        const isFocused = state.index === index;
+                    <View style={styles.tabRow}>
+                        {state.routes.map((route, index) => {
+                            const { options } = descriptors[route.key];
+                            const isFocused = state.index === index;
 
-                        const onPress = () => {
-                            const event = navigation.emit({
-                                type: 'tabPress',
-                                target: route.key,
-                                canPreventDefault: true,
-                            });
+                            const onPress = () => {
+                                const event = navigation.emit({
+                                    type: 'tabPress',
+                                    target: route.key,
+                                    canPreventDefault: true,
+                                });
 
-                            if (!isFocused && !event.defaultPrevented) {
-                                navigation.navigate(route.name);
+                                if (!isFocused && !event.defaultPrevented) {
+                                    navigation.navigate(route.name);
+                                }
+                            };
+
+                            // Icon Mapping
+                            let IconComponent = Home;
+                            if (route.name === 'Home') IconComponent = Home;
+                            else if (route.name === 'Navigate') IconComponent = Map;
+                            else if (route.name === 'Safety') IconComponent = Shield;
+                            else if (route.name === 'Chat') IconComponent = MessageCircle;
+
+                            // Insert SOS Button in the middle (between index 1 and 2)
+                            if (index === 2) {
+                                return (
+                                    <React.Fragment key="sos-spacer">
+                                        {/* Spacer for SOS Button */}
+                                        <View style={styles.sosSpacer} />
+                                        <TabButton
+                                            key={route.key}
+                                            index={index}
+                                            isFocused={isFocused}
+                                            onPress={onPress}
+                                            IconComponent={IconComponent}
+                                            label={route.name}
+                                            options={options}
+                                        />
+                                    </React.Fragment>
+                                );
                             }
-                        };
 
-                        const onLongPress = () => {
-                            navigation.emit({
-                                type: 'tabLongPress',
-                                target: route.key,
-                            });
-                        };
-
-                        return (
-                            <TabIcon
-                                key={route.key}
-                                isFocused={isFocused}
-                                options={options}
-                                onPress={onPress}
-                                onLongPress={onLongPress}
-                                routeName={route.name}
-                            />
-                        );
-                    })}
+                            return (
+                                <TabButton
+                                    key={route.key}
+                                    index={index}
+                                    isFocused={isFocused}
+                                    onPress={onPress}
+                                    IconComponent={IconComponent}
+                                    label={route.name}
+                                    options={options}
+                                />
+                            );
+                        })}
+                    </View>
                 </View>
-            </BlurView>
+
+                {/* Floating SOS Button */}
+                <TouchableOpacity
+                    style={[styles.sosButton, SHADOWS.glow]}
+                    onPress={startSOSConfirmation}
+                    activeOpacity={0.9}
+                >
+                    <LinearGradient
+                        colors={['#EF4444', '#DC2626']}
+                        style={styles.sosGradient}
+                    >
+                        <Text style={styles.sosText}>SOS</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
         </View>
     );
-}
+};
 
-// Sub-component for individual tab icon with animations
-function TabIcon({ isFocused, options, onPress, onLongPress, routeName }: any) {
-    const scale = useSharedValue(isFocused ? 1.1 : 1);
-    // 0 = unfocused, 1 = focused
-    const focusVal = useSharedValue(isFocused ? 1 : 0);
-
-    useEffect(() => {
-        scale.value = withSpring(isFocused ? 1.2 : 1, { damping: 10 });
-        focusVal.value = withTiming(isFocused ? 1 : 0, { duration: 300 });
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: scale.value }],
-            opacity: withTiming(isFocused ? 1 : 0.6)
-        };
-    });
-
-    const glowStyle = useAnimatedStyle(() => {
-        return {
-            opacity: focusVal.value,
-            shadowOpacity: focusVal.value
-        };
-    });
-
-    // Icons map based on route name (generic fallback if not provided in options)
-    let iconLabel = "❓";
-    if (routeName === "Home") iconLabel = "🏠";
-    if (routeName === "Navigate") iconLabel = "🗺️";
-    if (routeName === "Safety") iconLabel = "🛡️";
-    if (routeName === "Profile") iconLabel = "👤";
-
-    // Custom coloring for "Nano Banana Pro"
-    // Deep Violet for Safety, Cyan for Map, White for Home/Profile
-    const activeColor = routeName === 'Safety' ? '#FF2D55' : routeName === 'Navigate' ? '#00F0FF' : '#FFFFFF';
-
+const TabButton = ({ index, isFocused, onPress, IconComponent, label, options }: any) => {
     return (
         <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarTestID}
             onPress={onPress}
-            onLongPress={onLongPress}
             style={styles.tabButton}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
         >
-            <Animated.View style={[styles.iconContainer, animatedStyle]}>
-
-                {/* Visual Glow Background (Only visible when selected) */}
-                <Animated.View style={[
-                    StyleSheet.absoluteFill,
-                    styles.glowInfo,
-                    glowStyle,
-                    { backgroundColor: activeColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : activeColor + '40' } // 40 = 25% opacity
-                ]}
-                />
-
-                <Text style={{ fontSize: 24, textShadowColor: isFocused ? activeColor : 'transparent', textShadowRadius: 10 }}>
-                    {iconLabel}
-                </Text>
-
-            </Animated.View>
-
-            {/* Optional Label (Hidden for cleaner look or shown small) */}
-            {/* <Text style={{fontSize: 10, color: '#FFF'}}>
-                {options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : routeName}
-            </Text> */}
+            <TabItem
+                icon={IconComponent}
+                label={label}
+                focused={isFocused}
+            />
         </TouchableOpacity>
     );
 }
 
+const TabItem = ({ icon: Icon, label, focused }: { icon: any, label: string, focused: boolean }) => {
+    // Animation for icon movement
+    const animatedIconStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: withSpring(focused ? -2 : 0) }],
+        };
+    });
+
+    return (
+        <View style={styles.itemContainer}>
+            <Animated.View style={[
+                styles.iconWrapper,
+                animatedIconStyle,
+                focused && styles.activeIconWrapper
+            ]}>
+                <Icon
+                    size={24}
+                    color={focused ? COLORS.primary : COLORS.textSecondary}
+                    strokeWidth={focused ? 2.5 : 2}
+                />
+            </Animated.View>
+
+            <Text style={[styles.label, focused && styles.activeLabel]}>{label}</Text>
+        </View>
+    );
+};
+
 const styles = StyleSheet.create({
-    container: {
+    wrapper: {
         position: 'absolute',
-        bottom: 25,
-        left: 20,
-        right: 20,
+        bottom: 0,
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        justifyContent: 'center',
-        // Ensure it sits above everything
-        zIndex: 9999,
-        elevation: 20,
+        paddingBottom: SPACING.l, // Lift up from bottom
+        pointerEvents: 'box-none', // Allow touches through wrapper if needed
     },
-    blurContainer: {
+    container: {
+        width: width - (SPACING.m * 2), // Full width minus margins
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+    pillContainer: {
         width: '100%',
-        height: 70,
-        borderRadius: 35,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(0,0,0,0.4)', // Base dark tint
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
+        backgroundColor: '#FFFFFF',
+        borderRadius: RADIUS.full,
+        height: 70, // Fixed height for pill
+        justifyContent: 'center',
     },
-    tabsRow: {
+    topBorderLine: {
+        position: 'absolute',
+        top: 0,
+        left: '20%',
+        right: '20%',
+        height: 2,
+        opacity: 0.5,
+    },
+    tabRow: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
         alignItems: 'center',
-        height: '100%',
+        justifyContent: 'space-between',
+        paddingHorizontal: SPACING.s,
     },
     tabButton: {
         flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
         height: '100%',
     },
-    iconContainer: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+    sosSpacer: {
+        width: 70, // Space for the SOS button
+    },
+    sosButton: {
+        position: 'absolute',
+        bottom: 20, // Protrude upwards
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        padding: 4, // Border effect
+        backgroundColor: '#FFF', // White ring
         justifyContent: 'center',
         alignItems: 'center',
-        // overflow: 'hidden', // Don't clip shadows
+        elevation: 10,
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
     },
-    glowInfo: {
-        borderRadius: 25,
-        // Add blurred glow box shadow
-        shadowColor: '#FFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowRadius: 15,
+    sosGradient: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        borderRadius: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sosText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 1,
+    },
+    itemContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    iconWrapper: {
+        marginBottom: 4,
+    },
+    activeIconWrapper: {
+        // Removed background for cleaner look, strictly following design
+    },
+    label: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: COLORS.textTertiary,
+    },
+    activeLabel: {
+        color: COLORS.primary,
+        fontWeight: '800',
     }
 });
+
+export default CustomTabBar;
