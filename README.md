@@ -1,8 +1,8 @@
 
 <div align="center">
 
-# 🛡️ G U A R D I A N &nbsp; A N G E L
-### *The Next Generation of Personal Safety & Rapid Response*
+# 🛡️ A &nbsp; M &nbsp; B &nbsp; A
+### *Aegis for Marginalized and Brave Women*
 
 [![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
@@ -27,7 +27,7 @@ In an era of increasing uncertainty, personal safety apps often suffer from thre
 3.  **Trust:** Digital evidence is easily tampered with, rendering it inadmissible in court.
 
 ## 💎 The Solution
-**Guardian Angel** is not just an app; it is a holistic **Safety Ecosystem** built on **Three Pillars of Defense**:
+**AMBA (Aegis for Marginalized and Brave Women)** is not just an app; it is a holistic **Safety Ecosystem** built on **Three Pillars of Defense**:
 1.  **The Shield:** An offline-first mobile sentinel for immediate protection.
 2.  **The Sword:** A real-time command center (Cortex) for rapid police response.
 3.  **The Sanctuary:** A support community connecting survivors, NGOs, and lawyers.
@@ -42,7 +42,7 @@ Built on **Expo & React Native**, designed for extreme reliability under pressur
 *   **Cryptographic Chain of Custody:** Every audio recording is hashed (SHA-256) at the source to prevent tampering.
 *   **Tactical Simplicity:** Shake-to-SOS and Voice Activation for hands-free triggering.
 
-### �️ 2. The Sword (Cortex Dashboard)
+### 🖥️ 2. The Sword (Cortex Dashboard)
 A **Vite + React 19** command center designed for authorities.
 *   **Real-time Intel:** Live tracking of all active distress signals on a tactical map.
 *   **Data Visualization:** Heatmaps of high-risk zones powered by `Recharts`.
