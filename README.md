@@ -14,7 +14,7 @@
 
 🚀 **Built for HACK KRMU 5.0** 🚀
 
-[View Demo](https://youtu.be/example) • [Report Bug](https://github.com/Rohanx777/amba/issues) • [Request Feature](https://github.com/Rohanx777/amba/issues)
+[Report Bug](https://github.com/Rohanx777/amba/issues) • [Request Feature](https://github.com/Rohanx777/amba/issues)
 
 </div>
 
@@ -89,7 +89,6 @@ cd amba
 
 **2. Ignite The Shield (Mobile App)**
 ```bash
-cd SafeRouteExpo-2.3
 npm install
 npx expo start
 ```
